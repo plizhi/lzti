@@ -1,0 +1,1 @@
+export { primaryHighQuestionnaire } from './questionnaire';
