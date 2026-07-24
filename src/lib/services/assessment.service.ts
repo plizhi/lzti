@@ -177,6 +177,37 @@ export async function submitAttempt(
 
   const attemptId = attempt.id;
 
+  // 生成单视角报告
+  const report = {
+    id: crypto.randomUUID(),
+    currentStatus: Object.entries(quadrants).map(([dimensionId, quadrantType]) => ({
+      dimensionId,
+      quadrantType,
+      scores: scores[dimensionId as keyof typeof scores],
+    })),
+    trajectory: { riskLevel: 'medium', riskCombinations: [], predictedPath: '', protectiveFactors: [] },
+    suggestions: [],
+  };
+
+  // 保存报告
+  await prisma.attemptReport.create({
+    data: {
+      attemptId,
+      currentStatus: report.currentStatus,
+      trajectory: report.trajectory,
+      suggestions: report.suggestions,
+    },
+  });
+
+  // 更新 session 完成状态
+  const completed = JSON.parse(session.completed);
+  completed[questionnaireType as keyof typeof completed] = true;
+
+  await prisma.assessmentSession.update({
+    where: { id: sessionId },
+    data: { completed: JSON.stringify(completed) },
+  });
+
   return {
     attemptId,
     sessionId,
