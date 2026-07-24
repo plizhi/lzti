@@ -3,24 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getStage } from '@/data/questionnaires';
-import { primaryLowQuestionnaire } from '@/data/questionnaires/primary-low';
-import { primaryHighQuestionnaire } from '@/data/questionnaires/primary-high';
-import { middleSchoolQuestionnaire } from '@/data/questionnaires/middle-school';
-import { junior3Questionnaire } from '@/data/questionnaires/junior-3';
-import { senior1Questionnaire } from '@/data/questionnaires/senior-1';
-import { senior3Questionnaire } from '@/data/questionnaires/senior-3';
-import { createAssessmentSession, getLatestSession } from '@/lib/storage';
-import type { StageId, DimensionAnswers, Questionnaire, Question } from '@/types';
-
-const questionnaires: Record<string, Questionnaire> = {
-  'primary-low': primaryLowQuestionnaire,
-  'primary-high': primaryHighQuestionnaire,
-  'junior-1': middleSchoolQuestionnaire,
-  'junior-3': junior3Questionnaire,
-  'senior-1': senior1Questionnaire,
-  'senior-3': senior3Questionnaire,
-};
+import { getStage, getQuestionnaire } from '@/data/questionnaires';
+import { assessment } from '@/lib/api/client';
+import type { StageId, Questionnaire, Question } from '@/types';
+import type { DimensionAnswers } from '@/types/assessment';
 
 type QuestionnaireType = 'student' | 'parent' | 'teacher';
 
@@ -30,7 +16,6 @@ const typeLabels: Record<QuestionnaireType, string> = {
   teacher: '教师评价',
 };
 
-// 测评流程顺序
 const ASSESSMENT_FLOW: QuestionnaireType[] = ['parent', 'student', 'teacher'];
 
 function getNextQuestionnaireType(current: QuestionnaireType): QuestionnaireType | null {
@@ -44,9 +29,9 @@ function getQuestionsForType(questionnaire: Questionnaire, type: QuestionnaireTy
     case 'student':
       return questionnaire.studentQuestions ?? questionnaire.questions ?? [];
     case 'parent':
-      return questionnaire.parentQuestions ?? [];
+      return questionnaire.parentQuestions ?? questionnaire.questions ?? [];
     case 'teacher':
-      return questionnaire.teacherQuestions ?? [];
+      return questionnaire.teacherQuestions ?? questionnaire.questions ?? [];
     default:
       return questionnaire.questions ?? [];
   }
@@ -63,73 +48,48 @@ export default function AssessmentPage() {
   const searchParams = useSearchParams();
   const stageId = params.stage as StageId;
   const typeParam = searchParams.get('type') as QuestionnaireType | null;
-  const sessionIdParam = searchParams.get('session') as string | null;
+  const sessionIdParam = searchParams.get('sessionId');
 
   const stage = getStage(stageId);
-  const questionnaire = questionnaires[stageId];
+  const questionnaire = getQuestionnaire(stageId);
 
   const [sessionId, setSessionId] = useState<string | null>(sessionIdParam);
   const [questionnaireType, setQuestionnaireType] = useState<QuestionnaireType>(
     typeParam && ['student', 'parent', 'teacher'].includes(typeParam) ? typeParam : 'parent'
   );
   const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
-  const [answers, setAnswers] = useState<DimensionAnswers>({});
+  const [answers, setAnswers] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 创建新会话（如果是第一次进入）
   useEffect(() => {
     if (!stage || !questionnaire) {
       router.push('/');
-      return;
     }
+  }, [stage, questionnaire, router]);
 
-    // 如果没有session，创建一个新的
-    if (!sessionId) {
-      const existingSession = getLatestSession(stageId);
-      if (existingSession) {
-        // 复用已有会话
-        setSessionId(existingSession.id);
-      } else {
-        // 创建新会话
-        const newSession = createAssessmentSession(stageId);
-        setSessionId(newSession.id);
-        router.replace(`/assessment/${stageId}?type=parent&session=${newSession.id}`, { scroll: false });
-      }
-    }
-  }, [stage, questionnaire, router, sessionId, stageId]);
-
-  if (!stage || !questionnaire || !sessionId) {
+  if (!stage || !questionnaire) {
     return null;
   }
 
   const allQuestions = getQuestionsForType(questionnaire, questionnaireType);
-
-  // 确定可用的问卷类型（基于当前问卷是否有该类型题目）
   const availableTypes: QuestionnaireType[] = ASSESSMENT_FLOW.filter((type) =>
     isTypeAvailable(questionnaire, type)
   );
 
   const currentDimension = questionnaire.dimensions[currentDimensionIndex];
-  const dimensionQuestions = allQuestions.filter(
-    (q) => q.dimensionId === currentDimension.id
-  );
+  const dimensionQuestions = allQuestions.filter((q) => q.dimensionId === currentDimension.id);
 
   const progress = ((currentDimensionIndex + 1) / questionnaire.dimensions.length) * 100;
 
   const handleAnswer = (questionId: string, value: number) => {
-    const dimensionAnswers = answers[currentDimension.id] ?? {};
-    setAnswers({
-      ...answers,
-      [currentDimension.id]: {
-        ...dimensionAnswers,
-        [questionId]: value,
-      },
-    });
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: value,
+    }));
   };
 
   const isDimensionComplete = () => {
-    const dimensionAnswers = answers[currentDimension.id] ?? {};
-    return dimensionQuestions.every((q) => dimensionAnswers[q.id] !== undefined);
+    return dimensionQuestions.every((q) => answers[q.id] !== undefined);
   };
 
   const handleNext = () => {
@@ -145,39 +105,38 @@ export default function AssessmentPage() {
   };
 
   const handleSubmit = async () => {
+    if (!sessionId) return;
     setIsSubmitting(true);
 
-    const attemptId = crypto.randomUUID();
+    try {
+      const result = await assessment.submitAttempt(sessionId, {
+        questionnaireType,
+        answers,
+      });
 
-    const result = {
-      id: attemptId,
-      stageId,
-      sessionId,
-      questionnaireType,
-      answers,
-    };
-
-    sessionStorage.setItem('assessment-result', JSON.stringify(result));
-
-    // 跳转到报告页
-    router.push(`/report/${attemptId}?session=${sessionId}`);
+      // 跳转到报告页
+      router.push(`/report/${result.attemptId}?sessionId=${sessionId}`);
+    } catch (err) {
+      console.error('提交失败:', err);
+      setIsSubmitting(false);
+    }
   };
 
   const handleTypeChange = (newType: QuestionnaireType) => {
     setQuestionnaireType(newType);
     setCurrentDimensionIndex(0);
     setAnswers({});
-    router.replace(`/assessment/${stageId}?type=${newType}&session=${sessionId}`, { scroll: false });
+    if (sessionId) {
+      router.replace(`/assessment/${stageId}?type=${newType}&sessionId=${sessionId}`, { scroll: false });
+    }
   };
 
   const isLastDimension = currentDimensionIndex === questionnaire.dimensions.length - 1;
   const allDimensionsComplete = questionnaire.dimensions.every((dim) => {
-    const dimAnswers = answers[dim.id] ?? {};
     const dimQuestions = allQuestions.filter((q) => q.dimensionId === dim.id);
-    return dimQuestions.every((q) => dimAnswers[q.id] !== undefined);
+    return dimQuestions.every((q) => answers[q.id] !== undefined);
   });
 
-  // 获取下一步要完成的问卷类型
   const nextType = getNextQuestionnaireType(questionnaireType);
   const hasNextType = nextType && isTypeAvailable(questionnaire, nextType);
 
@@ -194,7 +153,6 @@ export default function AssessmentPage() {
             </span>
           </div>
 
-          {/* 当前步骤指示器 */}
           <div className="mt-3 flex items-center justify-center gap-2 text-sm">
             {availableTypes.map((type, index) => {
               const isActive = type === questionnaireType;
@@ -223,7 +181,6 @@ export default function AssessmentPage() {
             })}
           </div>
 
-          {/* 问卷类型切换（允许手动切换） */}
           {availableTypes.length > 1 && (
             <div className="mt-3 flex gap-2">
               {availableTypes.map((type) => (
@@ -258,7 +215,7 @@ export default function AssessmentPage() {
       <main className="mx-auto max-w-2xl px-6 py-8">
         <div className="space-y-6">
           {dimensionQuestions.map((question, qIndex) => {
-            const currentAnswer = answers[currentDimension.id]?.[question.id];
+            const currentAnswer = answers[question.id];
 
             return (
               <div key={question.id} className="rounded-xl bg-white p-5 shadow-sm">
@@ -302,9 +259,9 @@ export default function AssessmentPage() {
           {isLastDimension ? (
             <button
               onClick={handleSubmit}
-              disabled={!allDimensionsComplete || isSubmitting}
+              disabled={!allDimensionsComplete || isSubmitting || !sessionId}
               className={`flex-1 rounded-xl py-4 font-medium transition-all ${
-                allDimensionsComplete && !isSubmitting
+                allDimensionsComplete && !isSubmitting && sessionId
                   ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-md'
                   : 'bg-stone-200 text-stone-400 cursor-not-allowed'
               }`}
@@ -326,7 +283,6 @@ export default function AssessmentPage() {
           )}
         </div>
 
-        {/* 下一步提示 */}
         {isLastDimension && hasNextType && (
           <div className="mt-4 text-center text-sm text-stone-500">
             完成当前问卷后，可以继续填写 {typeLabels[nextType!]} {typeLabels[questionnaireType]} 已完成 ✓

@@ -1,4 +1,24 @@
 import type { Stage, StageId } from '@/types/stage';
+import type { Questionnaire } from '@/types/questionnaire';
+import { primaryLowQuestionnaire } from './primary-low';
+import { primaryHighQuestionnaire } from './primary-high';
+import { middleSchoolQuestionnaire } from './middle-school';
+import { junior3Questionnaire } from './junior-3';
+import { senior1Questionnaire } from './senior-1';
+import { senior3Questionnaire } from './senior-3';
+
+export const questionnaires: Record<StageId, Questionnaire> = {
+  'primary-low': primaryLowQuestionnaire,
+  'primary-high': primaryHighQuestionnaire,
+  'junior-1': middleSchoolQuestionnaire,
+  'junior-3': junior3Questionnaire,
+  'senior-1': senior1Questionnaire,
+  'senior-3': senior3Questionnaire,
+};
+
+export function getQuestionnaire(stageId: string): Questionnaire | null {
+  return questionnaires[stageId as StageId] ?? null;
+}
 
 export const stages: Record<StageId, Stage> = {
   'primary-low': {

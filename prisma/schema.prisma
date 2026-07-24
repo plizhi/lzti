@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  phone         String    @unique
+  passwordHash  String?
+  name          String?
+  role          String    @default("PARENT")
+  children      Child[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model InvitationCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  createdBy   String
+  expiresAt   DateTime
+  maxUses     Int      @default(1)
+  usedCount   Int      @default(0)
+  isActive    Boolean  @default(true)
+  children    Child[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([code])
+}
+
+model Child {
+  id               String              @id @default(cuid())
+  userId           String
+  user             User                @relation(fields: [userId], references: [id])
+  name             String
+  gender           String?
+  birthDate        DateTime?
+  grade            String?
+  invitationCodeId String?
+  invitationCode   InvitationCode?     @relation(fields: [invitationCodeId], references: [id])
+  sessions         AssessmentSession[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([userId])
+}
+
+model AssessmentSession {
+  id        String           @id @default(cuid())
+  childId   String
+  child     Child            @relation(fields: [childId], references: [id])
+  stageId   String
+  completed String           @default("{\"parent\":false,\"student\":false,\"teacher\":false}")
+  attempts  SessionAttempt[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([childId])
+}
+
+model SessionAttempt {
+  id                String        @id @default(cuid())
+  sessionId         String
+  session           AssessmentSession @relation(fields: [sessionId], references: [id])
+  childId           String
+  questionnaireType String
+  stageId           String
+  answers           Json
+  scores            Json
+  quadrants         Json
+  report            AttemptReport?
+  createdAt         DateTime      @default(now())
+
+  @@index([sessionId])
+  @@index([childId])
+}
+
+model AttemptReport {
+  id            String   @id @default(cuid())
+  attemptId     String   @unique
+  attempt       SessionAttempt @relation(fields: [attemptId], references: [id])
+  currentStatus Json
+  trendAnalysis Json?
+  trajectory    Json
+  suggestions   Json
+  createdAt     DateTime @default(now())
+}
