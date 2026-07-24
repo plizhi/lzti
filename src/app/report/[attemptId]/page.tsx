@@ -3,17 +3,33 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { primaryLowQuestionnaire } from '@/data/questionnaires/primary-low';
+import { primaryLowQuestionnaire, primaryLowStudentScoring, primaryLowParentScoring, primaryLowTeacherScoring } from '@/data/questionnaires/primary-low';
 import { primaryHighQuestionnaire } from '@/data/questionnaires/primary-high';
 import { middleSchoolQuestionnaire } from '@/data/questionnaires/middle-school';
 import { junior3Questionnaire } from '@/data/questionnaires/junior-3';
 import { senior1Questionnaire } from '@/data/questionnaires/senior-1';
 import { senior3Questionnaire } from '@/data/questionnaires/senior-3';
-import { calculateAllDimensionScores } from '@/lib/scoring/calculator';
-import { generateReport } from '@/lib/report/generator';
+import { calculateAllDimensionScores, determineQuadrantType } from '@/lib/scoring/calculator';
+import { determineAllQuadrants } from '@/lib/scoring/quadrant';
+import { generateSingleReport } from '@/lib/report/generator';
 import { getStage } from '@/data/questionnaires';
 import { saveAttempt, getPreviousAttempt } from '@/lib/storage';
-import type { AssessmentAttempt, DimensionQuadrants, QuadrantResult, Questionnaire } from '@/types';
+import type { AssessmentAttempt, DimensionQuadrants, DimensionScores, QuadrantResult, Questionnaire, DimensionAnswers } from '@/types';
+import type { ScoringConfig } from '@/types/questionnaire';
+
+/**
+ * 将 DimensionAnswers { dimensionId: { questionId: score } }
+ * 展平为 Record<string, number> { questionId: score }
+ */
+function flattenAnswers(dimensionAnswers: DimensionAnswers): Record<string, number> {
+  const flat: Record<string, number> = {};
+  for (const dimensionAnswersMap of Object.values(dimensionAnswers)) {
+    for (const [questionId, score] of Object.entries(dimensionAnswersMap)) {
+      flat[questionId] = score;
+    }
+  }
+  return flat;
+}
 
 const questionnaires: Record<string, Questionnaire> = {
   'primary-low': primaryLowQuestionnaire,
@@ -22,6 +38,15 @@ const questionnaires: Record<string, Questionnaire> = {
   'junior-3': junior3Questionnaire,
   'senior-1': senior1Questionnaire,
   'senior-3': senior3Questionnaire,
+};
+
+// 临时：仅小学低年级有计分配置
+const scoringConfigs: Record<string, Record<string, ScoringConfig>> = {
+  'primary-low': {
+    student: primaryLowStudentScoring,
+    parent: primaryLowParentScoring,
+    teacher: primaryLowTeacherScoring,
+  },
 };
 
 function getQuadrantDetails(questionnaire: Questionnaire) {
@@ -151,7 +176,7 @@ export default function ReportPage() {
   const router = useRouter();
   const attemptId = params.attemptId as string;
 
-  const [report, setReport] = useState<ReturnType<typeof generateReport> | null>(null);
+  const [report, setReport] = useState<ReturnType<typeof generateSingleReport> | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
   const [questionnaireType, setQuestionnaireType] = useState<string | null>(null);
   const [quadrantDetails, setQuadrantDetails] = useState<Record<string, QuadrantResult>>({});
@@ -176,39 +201,36 @@ export default function ReportPage() {
       return;
     }
 
-    const scores = calculateAllDimensionScores(questionnaire, result.answers);
+    const questionnaireType = (result.questionnaireType ?? 'student') as 'student' | 'parent' | 'teacher';
+    const stageScoring = scoringConfigs[result.stageId];
 
-    const quadrants: DimensionQuadrants = {};
+    let scores: DimensionScores = {};
+    let quadrants: DimensionQuadrants = {};
+
+    if (stageScoring && stageScoring[questionnaireType]) {
+      // 使用新的计分配置
+      const scoringConfig = stageScoring[questionnaireType];
+      const questions = questionnaireType === 'student'
+        ? (questionnaire.studentQuestions ?? questionnaire.questions ?? [])
+        : questionnaireType === 'parent'
+          ? questionnaire.parentQuestions ?? []
+          : questionnaire.teacherQuestions ?? [];
+
+      const { scores: rawScores, normalizedScores } = calculateAllDimensionScores(
+        scoringConfig,
+        questions,
+        flattenAnswers(result.answers)
+      );
+      scores = rawScores;
+      quadrants = determineAllQuadrants(rawScores);
+    } else {
+      // 旧数据或未配置计分的学段，跳过详细计分
+      scores = {};
+      quadrants = {};
+    }
+
     const qDetails = getQuadrantDetails(questionnaire);
     setQuadrantDetails(qDetails);
-
-    for (const [dimId, score] of Object.entries(scores) as [string, { axis1: number; axis2: number }][]) {
-      const dim = questionnaire.dimensions.find((d) => d.id === dimId);
-      if (!dim) continue;
-
-      const threshold = 50;
-      const axis1High = score.axis1 >= threshold;
-      const axis2High = score.axis2 >= threshold;
-
-      let type: QuadrantResult['type'];
-      let name: string;
-
-      if (axis1High && axis2High) {
-        type = 'optimal';
-        name = dim.quadrants[0]?.name ?? '理想型';
-      } else if (!axis1High && axis2High) {
-        type = 'strategy';
-        name = dim.quadrants[1]?.name ?? '策略型';
-      } else if (!axis1High && !axis2High) {
-        type = 'passive';
-        name = dim.quadrants[2]?.name ?? '被动型';
-      } else {
-        type = 'overwhelmed';
-        name = dim.quadrants[3]?.name ?? '过度型';
-      }
-
-      quadrants[dimId] = type;
-    }
 
     // 保存到本地历史记录
     saveAttempt({
@@ -221,35 +243,26 @@ export default function ReportPage() {
       createdAt: new Date().toISOString(),
     });
 
-    // 获取上一次的测评记录用于趋势对比
-    const previousAttemptData = getPreviousAttempt(result.stageId, result.id);
-    const previousAttempt = previousAttemptData ? {
-      id: previousAttemptData.id,
-      userId: 'anonymous',
-      stageId: previousAttemptData.stageId as any,
-      answers: previousAttemptData.answers,
-      scores: previousAttemptData.scores,
-      quadrants: previousAttemptData.quadrants,
-      createdAt: new Date(previousAttemptData.createdAt),
-    } : null;
+    // 生成报告
+    if (stageScoring && stageScoring[questionnaireType]) {
+      const scoringConfig = stageScoring[questionnaireType];
+      const questions = questionnaireType === 'student'
+        ? (questionnaire.studentQuestions ?? questionnaire.questions ?? [])
+        : questionnaireType === 'parent'
+          ? questionnaire.parentQuestions ?? []
+          : questionnaire.teacherQuestions ?? [];
 
-    const attempt: AssessmentAttempt = {
-      id: result.id,
-      userId: 'anonymous',
-      stageId: result.stageId as any,
-      answers: result.answers,
-      scores,
-      quadrants,
-      createdAt: new Date(),
-    };
+      const generatedReport = generateSingleReport(
+        questionnaire,
+        scoringConfig,
+        flattenAnswers(result.answers),
+        result.id,
+        questionnaireType
+      );
 
-    const generatedReport = generateReport({
-      currentAttempt: attempt,
-      previousAttempt,
-      questionnaire,
-    });
+      setReport(generatedReport);
+    }
 
-    setReport(generatedReport);
     setStageId(result.stageId);
     setQuestionnaireType(result.questionnaireType ?? 'student');
   }, [attemptId, router]);
@@ -356,7 +369,7 @@ export default function ReportPage() {
                     <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs">优先关注</span>
                   )}
                 </div>
-                <p className="text-sm text-stone-600 mb-2">{s.suggestion}</p>
+                <p className="text-sm text-stone-600 mb-2">{s.dimensionName}：{s.quadrantName}</p>
                 <p className="text-sm text-amber-600 italic">{s.guidance}</p>
               </div>
             ))}

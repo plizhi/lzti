@@ -12,6 +12,24 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-2xl px-6 pb-12">
+        {/* 快速体验入口 */}
+        <div className="mb-6 rounded-2xl bg-gradient-to-r from-amber-100 to-orange-100 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-amber-800">快速体验</h3>
+              <p className="text-sm text-amber-700 mt-1">
+                3道题快速感知孩子的学习状态，约1分钟
+              </p>
+            </div>
+            <Link
+              href="/screening/primary-low"
+              className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-600 transition-colors"
+            >
+              开始体验
+            </Link>
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           {stages.map((stage) => (
             <Link

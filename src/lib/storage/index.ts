@@ -59,3 +59,16 @@ export function clearAttemptHistory(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
 }
+
+// Session storage exports
+export type { AssessmentSession, SessionAttempt } from './session';
+export {
+  createAssessmentSession,
+  getSessions,
+  getSession,
+  updateSession,
+  saveSessionAttempt,
+  getSessionAttempts,
+  getAttemptsBySession,
+  getLatestSession,
+} from './session';

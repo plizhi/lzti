@@ -10,7 +10,8 @@ import { middleSchoolQuestionnaire } from '@/data/questionnaires/middle-school';
 import { junior3Questionnaire } from '@/data/questionnaires/junior-3';
 import { senior1Questionnaire } from '@/data/questionnaires/senior-1';
 import { senior3Questionnaire } from '@/data/questionnaires/senior-3';
-import type { StageId, DimensionAnswers, QuestionAnswers, Questionnaire, Question } from '@/types';
+import { createAssessmentSession, getLatestSession } from '@/lib/storage';
+import type { StageId, DimensionAnswers, Questionnaire, Question } from '@/types';
 
 const questionnaires: Record<string, Questionnaire> = {
   'primary-low': primaryLowQuestionnaire,
@@ -29,6 +30,15 @@ const typeLabels: Record<QuestionnaireType, string> = {
   teacher: '教师评价',
 };
 
+// 测评流程顺序
+const ASSESSMENT_FLOW: QuestionnaireType[] = ['parent', 'student', 'teacher'];
+
+function getNextQuestionnaireType(current: QuestionnaireType): QuestionnaireType | null {
+  const currentIndex = ASSESSMENT_FLOW.indexOf(current);
+  if (currentIndex < 0 || currentIndex >= ASSESSMENT_FLOW.length - 1) return null;
+  return ASSESSMENT_FLOW[currentIndex + 1];
+}
+
 function getQuestionsForType(questionnaire: Questionnaire, type: QuestionnaireType): Question[] {
   switch (type) {
     case 'student':
@@ -42,8 +52,9 @@ function getQuestionsForType(questionnaire: Questionnaire, type: QuestionnaireTy
   }
 }
 
-function getQuestionnaireTitle(type: QuestionnaireType, stageName: string): string {
-  return `${stageName} - ${typeLabels[type]}问卷`;
+function isTypeAvailable(questionnaire: Questionnaire, type: QuestionnaireType): boolean {
+  const questions = getQuestionsForType(questionnaire, type);
+  return questions.length > 0;
 }
 
 export default function AssessmentPage() {
@@ -52,33 +63,51 @@ export default function AssessmentPage() {
   const searchParams = useSearchParams();
   const stageId = params.stage as StageId;
   const typeParam = searchParams.get('type') as QuestionnaireType | null;
+  const sessionIdParam = searchParams.get('session') as string | null;
 
   const stage = getStage(stageId);
   const questionnaire = questionnaires[stageId];
 
+  const [sessionId, setSessionId] = useState<string | null>(sessionIdParam);
   const [questionnaireType, setQuestionnaireType] = useState<QuestionnaireType>(
-    typeParam && ['student', 'parent', 'teacher'].includes(typeParam) ? typeParam : 'student'
+    typeParam && ['student', 'parent', 'teacher'].includes(typeParam) ? typeParam : 'parent'
   );
   const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
   const [answers, setAnswers] = useState<DimensionAnswers>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 创建新会话（如果是第一次进入）
   useEffect(() => {
     if (!stage || !questionnaire) {
       router.push('/');
+      return;
     }
-  }, [stage, questionnaire, router]);
 
-  if (!stage || !questionnaire) {
+    // 如果没有session，创建一个新的
+    if (!sessionId) {
+      const existingSession = getLatestSession(stageId);
+      if (existingSession) {
+        // 复用已有会话
+        setSessionId(existingSession.id);
+      } else {
+        // 创建新会话
+        const newSession = createAssessmentSession(stageId);
+        setSessionId(newSession.id);
+        router.replace(`/assessment/${stageId}?type=parent&session=${newSession.id}`, { scroll: false });
+      }
+    }
+  }, [stage, questionnaire, router, sessionId, stageId]);
+
+  if (!stage || !questionnaire || !sessionId) {
     return null;
   }
 
   const allQuestions = getQuestionsForType(questionnaire, questionnaireType);
-  const availableTypes: QuestionnaireType[] = [
-    'student',
-    ...(questionnaire.parentQuestions?.length ? ['parent' as const] : []),
-    ...(questionnaire.teacherQuestions?.length ? ['teacher' as const] : []),
-  ];
+
+  // 确定可用的问卷类型（基于当前问卷是否有该类型题目）
+  const availableTypes: QuestionnaireType[] = ASSESSMENT_FLOW.filter((type) =>
+    isTypeAvailable(questionnaire, type)
+  );
 
   const currentDimension = questionnaire.dimensions[currentDimensionIndex];
   const dimensionQuestions = allQuestions.filter(
@@ -123,20 +152,22 @@ export default function AssessmentPage() {
     const result = {
       id: attemptId,
       stageId,
+      sessionId,
       questionnaireType,
       answers,
     };
 
     sessionStorage.setItem('assessment-result', JSON.stringify(result));
 
-    router.push(`/report/${attemptId}`);
+    // 跳转到报告页
+    router.push(`/report/${attemptId}?session=${sessionId}`);
   };
 
   const handleTypeChange = (newType: QuestionnaireType) => {
     setQuestionnaireType(newType);
     setCurrentDimensionIndex(0);
     setAnswers({});
-    router.replace(`/assessment/${stageId}?type=${newType}`, { scroll: false });
+    router.replace(`/assessment/${stageId}?type=${newType}&session=${sessionId}`, { scroll: false });
   };
 
   const isLastDimension = currentDimensionIndex === questionnaire.dimensions.length - 1;
@@ -145,6 +176,10 @@ export default function AssessmentPage() {
     const dimQuestions = allQuestions.filter((q) => q.dimensionId === dim.id);
     return dimQuestions.every((q) => dimAnswers[q.id] !== undefined);
   });
+
+  // 获取下一步要完成的问卷类型
+  const nextType = getNextQuestionnaireType(questionnaireType);
+  const hasNextType = nextType && isTypeAvailable(questionnaire, nextType);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-20">
@@ -159,7 +194,36 @@ export default function AssessmentPage() {
             </span>
           </div>
 
-          {/* 问卷类型切换 */}
+          {/* 当前步骤指示器 */}
+          <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+            {availableTypes.map((type, index) => {
+              const isActive = type === questionnaireType;
+              const isPast = availableTypes.indexOf(questionnaireType) > index;
+              return (
+                <div key={type} className="flex items-center gap-2">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                      isActive
+                        ? 'bg-amber-500 text-white'
+                        : isPast
+                          ? 'bg-green-500 text-white'
+                          : 'bg-stone-200 text-stone-500'
+                    }`}
+                  >
+                    {isPast ? '✓' : index + 1}
+                  </div>
+                  <span className={isActive ? 'text-amber-600 font-medium' : 'text-stone-400'}>
+                    {typeLabels[type]}
+                  </span>
+                  {index < availableTypes.length - 1 && (
+                    <div className="w-8 h-px bg-stone-200" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 问卷类型切换（允许手动切换） */}
           {availableTypes.length > 1 && (
             <div className="mt-3 flex gap-2">
               {availableTypes.map((type) => (
@@ -245,7 +309,7 @@ export default function AssessmentPage() {
                   : 'bg-stone-200 text-stone-400 cursor-not-allowed'
               }`}
             >
-              {isSubmitting ? '提交中...' : '提交测评'}
+              {isSubmitting ? '提交中...' : '提交'}
             </button>
           ) : (
             <button
@@ -261,6 +325,13 @@ export default function AssessmentPage() {
             </button>
           )}
         </div>
+
+        {/* 下一步提示 */}
+        {isLastDimension && hasNextType && (
+          <div className="mt-4 text-center text-sm text-stone-500">
+            完成当前问卷后，可以继续填写 {typeLabels[nextType!]} {typeLabels[questionnaireType]} 已完成 ✓
+          </div>
+        )}
       </main>
     </div>
   );
