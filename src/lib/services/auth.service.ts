@@ -1,91 +1,132 @@
 import { prisma } from '@/lib/db';
 import { hashPassword, comparePassword, generateToken } from '@/lib/auth';
-import { validatePhone, validatePassword, validateInvitationCode, validateChildData } from '@/lib/validators';
+import { validatePhone, validatePassword, validateChildData } from '@/lib/validators';
 import { ApiError } from '@/lib/api/response';
-import { validateInvitationCode as validateInvitation } from './invitation.service';
-
-export interface RegisterData {
-  phone: string;
-  password: string;
-  invitationCode: string;
-  child: {
-    name: string;
-    gender?: string;
-    birthDate?: string;
-    grade?: string;
-  };
-}
+import { activateSlot, createUserInviteCodes } from './share.service';
 
 export interface LoginData {
   phone: string;
   password: string;
 }
 
-export async function register(data: RegisterData) {
-  const phone = validatePhone(data.phone);
-  const password = validatePassword(data.password);
-  const invitationCode = validateInvitationCode(data.invitationCode);
-  const childData = validateChildData(data.child);
+// 激活 Slot 并创建预账户
+export async function activateSlotAndCreatePendingUser(slotCode: string, childName?: string) {
+  // 验证并激活 Slot
+  const result = await activateSlot(slotCode);
 
-  // 检查手机号是否已注册
+  if (result.error) {
+    throw new ApiError(result.error, 400);
+  }
+
+  const slot = result.slot!;
+  const batch = result.batch!;
+
+  // 检查批次是否还有可用名额
+  if (slot.type === 'register' && batch.questionnaireType === 'register') {
+    // 这是注册类型的批次
+    // 创建预账户（关联到批次）
+    const user = await prisma.user.create({
+      data: {
+        status: 'PENDING',
+        shareBatchId: batch.id,
+      },
+    });
+
+    return {
+      user,
+      slot,
+      batch,
+    };
+  }
+
+  return {
+    slot,
+    batch,
+  };
+}
+
+// 完成注册（升级预账户）
+export async function completeRegistration(
+  userId: string,
+  phone: string,
+  password: string,
+  childData?: {
+    name: string;
+    gender?: string;
+    birthDate?: string;
+    grade?: string;
+  }
+) {
+  // 验证手机号格式
+  const validatedPhone = validatePhone(phone);
+
+  // 检查手机号是否已被使用
   const existingUser = await prisma.user.findUnique({
-    where: { phone },
+    where: { phone: validatedPhone },
   });
 
-  if (existingUser) {
+  if (existingUser && existingUser.id !== userId) {
     throw new ApiError('该手机号已注册', 409);
   }
 
-  // 验证邀请码
-  const validation = await validateInvitation(invitationCode);
-  if (!validation.valid) {
-    throw new ApiError(validation.error || '邀请码无效', 410);
+  // 获取用户
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new ApiError('用户不存在', 404);
   }
 
-  const invitation = validation.invitation!;
+  if (user.status === 'ACTIVE') {
+    throw new ApiError('账户已是正式账户', 400);
+  }
 
   // 密码哈希
   const passwordHash = await hashPassword(password);
 
-  // 创建用户和孩子
-  const user = await prisma.user.create({
+  // 升级账户
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
     data: {
-      phone,
+      phone: validatedPhone,
       passwordHash,
-      role: 'PARENT',
-      children: {
-        create: {
-          name: childData.name,
-          gender: childData.gender,
-          birthDate: childData.birthDate,
-          grade: childData.grade,
-          invitationCodeId: invitation.id,
-        },
-      },
-    },
-    include: {
-      children: true,
+      status: 'ACTIVE',
     },
   });
 
-  // 更新邀请码使用次数
-  await prisma.invitationCode.update({
-    where: { id: invitation.id },
-    data: { usedCount: invitation.usedCount + 1 },
-  });
+  // 如果有孩子信息，创建孩子
+  let child = null;
+  if (childData) {
+    const validatedChild = validateChildData(childData);
+    child = await prisma.child.create({
+      data: {
+        userId: updatedUser.id,
+        name: validatedChild.name,
+        gender: validatedChild.gender,
+        birthDate: validatedChild.birthDate,
+        grade: validatedChild.grade,
+      },
+    });
+  }
 
   // 生成 Token
-  const token = generateToken(user.id);
+  const token = generateToken(updatedUser.id);
+
+  // 赠送邀请码
+  const inviteCodes = await createUserInviteCodes(updatedUser.id, 10);
 
   return {
     user: {
-      id: user.id,
-      phone: user.phone,
-      name: user.name,
-      role: user.role,
+      id: updatedUser.id,
+      phone: updatedUser.phone,
+      name: updatedUser.name,
+      role: updatedUser.role,
+      status: updatedUser.status,
     },
-    child: user.children[0],
+    child,
     token,
+    inviteCodes: inviteCodes.map(c => c.code),
   };
 }
 
@@ -118,6 +159,7 @@ export async function login(data: LoginData) {
       phone: user.phone,
       name: user.name,
       role: user.role,
+      status: user.status,
     },
     token,
   };
@@ -152,6 +194,7 @@ export async function getCurrentUser(userId: string) {
     phone: user.phone,
     name: user.name,
     role: user.role,
+    status: user.status,
     children: user.children,
   };
 }

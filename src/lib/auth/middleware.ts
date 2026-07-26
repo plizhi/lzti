@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 export interface AuthContext {
   user: {
     id: string;
-    phone: string;
+    phone: string | null;
     role: string;
     name: string | null;
   };

@@ -1,29 +1,38 @@
 import { NextRequest } from 'next/server';
-import { validateInvitationCode } from '@/lib/services/invitation.service';
-import { apiSuccess, withAuth } from '@/lib/api/handler';
+import { validateSlotCode } from '@/lib/services/invitation.service';
+import { apiSuccess } from '@/lib/api/handler';
 
-export const POST = withAuth(async (request) => {
-  const body = await request.json();
-  const { code } = body;
+// 验证邀请码（支持新旧两种格式）
+// 新格式：Slot code
+// 旧格式：UserInviteCode（兼容）
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { code } = body;
 
-  if (!code || typeof code !== 'string') {
-    return apiSuccess({ error: '请提供邀请码' } as any, 400);
+    if (!code || typeof code !== 'string') {
+      return apiSuccess({ error: '请提供邀请码' }, 400);
+    }
+
+    // 先尝试新格式（Slot）
+    const slotResult = await validateSlotCode(code);
+    if (slotResult.valid) {
+      return apiSuccess({
+        valid: true,
+        type: 'slot',
+        invitation: {
+          id: slotResult.invitation!.id,
+          code: slotResult.invitation!.code,
+          batchId: slotResult.invitation!.batchId,
+          type: slotResult.invitation!.type,
+          expiresAt: slotResult.invitation!.expiresAt,
+        },
+      });
+    }
+
+    return apiSuccess({ valid: false, error: slotResult.error });
+  } catch (error) {
+    console.error('Validate invitation code error:', error);
+    return apiSuccess({ error: '验证失败' }, 500);
   }
-
-  const result = await validateInvitationCode(code);
-
-  if (!result.valid) {
-    return apiSuccess({ valid: false, error: result.error });
-  }
-
-  return apiSuccess({
-    valid: true,
-    invitation: {
-      id: result.invitation!.id,
-      code: result.invitation!.code,
-      expiresAt: result.invitation!.expiresAt,
-      maxUses: result.invitation!.maxUses,
-      usedCount: result.invitation!.usedCount,
-    },
-  });
-});
+}

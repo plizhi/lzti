@@ -51,7 +51,75 @@ function buildScoringConfig(
   };
 }
 
-export async function createSession(userId: string, data: { childId: string; stageId: string }) {
+// 通过 slot 创建 session（用于分享测评流程）
+export async function createSessionBySlot(
+  slotCode: string,
+  childId: string
+) {
+  // 验证 slot
+  const slot = await prisma.slot.findUnique({
+    where: { code: slotCode },
+    include: { batch: true },
+  });
+
+  if (!slot) {
+    throw new ApiError('邀请码不存在', 404);
+  }
+
+  if (slot.usedBy) {
+    throw new ApiError('此链接已被使用', 400);
+  }
+
+  if (slot.expiresAt < new Date()) {
+    throw new ApiError('此链接已过期', 400);
+  }
+
+  if (slot.type !== 'student' && slot.type !== 'teacher') {
+    throw new ApiError('此链接不是测评邀请', 400);
+  }
+
+  const stageId = slot.batch.stageId;
+
+  // 验证孩子存在且属于分享者
+  const child = await prisma.child.findFirst({
+    where: { id: childId, userId: slot.batch.userId },
+  });
+
+  if (!child) {
+    throw new ApiError('孩子档案不存在', 404);
+  }
+
+  // 更新 slot
+  await prisma.slot.update({
+    where: { id: slot.id },
+    data: {
+      usedBy: slot.batch.userId,
+      usedAt: new Date(),
+      childId,
+    },
+  });
+
+  // 创建 session
+  const session = await prisma.assessmentSession.create({
+    data: {
+      childId,
+      stageId,
+      slotId: slot.id,
+      completed: JSON.stringify({ parent: false, student: false, teacher: false }),
+    },
+  });
+
+  return {
+    id: session.id,
+    childId: session.childId,
+    stageId: session.stageId,
+    completed: JSON.parse(session.completed),
+    createdAt: session.createdAt,
+    questionnaireType: slot.type,
+  };
+}
+
+export async function createSession(userId: string, data: { childId: string; stageId: string; slotId?: string }) {
   const child = await prisma.child.findFirst({
     where: { id: data.childId, userId },
   });
@@ -66,6 +134,7 @@ export async function createSession(userId: string, data: { childId: string; sta
     data: {
       childId: data.childId,
       stageId,
+      slotId: data.slotId,
       completed: JSON.stringify({ parent: false, student: false, teacher: false }),
     },
   });
@@ -114,7 +183,7 @@ export async function getSession(sessionId: string, userId: string) {
 
 export async function submitAttempt(
   sessionId: string,
-  userId: string,
+  userId: string | null,
   data: {
     questionnaireType: string;
     answers: Record<string, number>;
@@ -122,10 +191,17 @@ export async function submitAttempt(
 ) {
   const questionnaireType = validateQuestionnaireType(data.questionnaireType);
 
-  const session = await prisma.assessmentSession.findFirst({
-    where: { id: sessionId, child: { userId } },
-    include: { child: true },
-  });
+  // 如果有 userId，验证 session 属于该用户
+  // 如果没有 userId（slot 流程），只验证 session 存在
+  const session = userId
+    ? await prisma.assessmentSession.findFirst({
+        where: { id: sessionId, child: { userId } },
+        include: { child: true },
+      })
+    : await prisma.assessmentSession.findUnique({
+        where: { id: sessionId },
+        include: { child: true },
+      });
 
   if (!session) {
     throw new ApiError('测评会话不存在', 404);

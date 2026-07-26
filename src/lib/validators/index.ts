@@ -20,7 +20,7 @@ export function validatePassword(password: unknown): string {
   return password;
 }
 
-export function validateRequired(value: unknown, fieldName: string): string {
+function validateRequired(value: unknown, fieldName: string): string {
   if (value === undefined || value === null || value === '') {
     throw new ApiError(`${fieldName}不能为空`, 400);
   }
@@ -28,16 +28,6 @@ export function validateRequired(value: unknown, fieldName: string): string {
     throw new ApiError(`${fieldName}格式错误`, 400);
   }
   return value;
-}
-
-export function validateInvitationCode(code: unknown): string {
-  if (typeof code !== 'string') {
-    throw new ApiError('邀请码格式错误', 400);
-  }
-  if (!/^\d{6}$/.test(code)) {
-    throw new ApiError('邀请码应为6位数字', 400);
-  }
-  return code;
 }
 
 export function validateChildData(data: {

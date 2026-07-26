@@ -7,32 +7,56 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 用户
+// PENDING: 预账户，激活邀请码后创建，无手机号密码
+// ACTIVE: 正式账户，注册后升级
 model User {
   id            String    @id @default(cuid())
-  phone         String    @unique
+  phone         String?   @unique
   passwordHash  String?
+  status        String    @default("PENDING")  // PENDING / ACTIVE
   name          String?
   role          String    @default("PARENT")
+  shareBatchId  String?   // 来自哪个分享批次
   children      Child[]
   createdAt     DateTime  @default(now())
+  expiresAt     DateTime? // PENDING 状态过期时间（测评完成后2小时）
   updatedAt     DateTime  @updatedAt
 }
 
-model InvitationCode {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  createdBy   String
-  expiresAt   DateTime
-  maxUses     Int      @default(1)
-  usedCount   Int      @default(0)
-  isActive    Boolean  @default(true)
-  children    Child[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// 分享批次
+// 老用户一次分享，携带多个 Slot
+model ShareBatch {
+  id                  String   @id @default(cuid())
+  userId              String   // 分享者
+  stageId             String   // 学段
+  questionnaireType   String   // 问卷类型：register / student / teacher
+  slots               Slot[]
+  createdAt           DateTime @default(now())
+  expiresAt           DateTime // 分享链接过期时间（2天）
 
+  @@index([userId])
+}
+
+// 邀请槽位
+// 每个 Slot 对应一个邀请码或测评机会
+model Slot {
+  id          String    @id @default(cuid())
+  batchId    String
+  batch      ShareBatch @relation(fields: [batchId], references: [id])
+  type       String    // register / student / teacher
+  code       String    @unique  // 激活码，6位数字
+  usedBy     String?   // 使用者 userId
+  usedAt     DateTime?
+  childId    String?   // 关联的孩子（测评用）
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  @@index([batchId])
   @@index([code])
 }
 
+// 孩子
 model Child {
   id               String              @id @default(cuid())
   userId           String
@@ -41,8 +65,6 @@ model Child {
   gender           String?
   birthDate        DateTime?
   grade            String?
-  invitationCodeId String?
-  invitationCode   InvitationCode?     @relation(fields: [invitationCodeId], references: [id])
   sessions         AssessmentSession[]
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -50,19 +72,23 @@ model Child {
   @@index([userId])
 }
 
+// 测评会话
 model AssessmentSession {
   id        String           @id @default(cuid())
   childId   String
   child     Child            @relation(fields: [childId], references: [id])
   stageId   String
   completed String           @default("{\"parent\":false,\"student\":false,\"teacher\":false}")
+  slotId    String?         // 通过哪个 Slot 创建
   attempts  SessionAttempt[]
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
   @@index([childId])
+  @@index([slotId])
 }
 
+// 测评尝试
 model SessionAttempt {
   id                String        @id @default(cuid())
   sessionId         String
@@ -80,6 +106,7 @@ model SessionAttempt {
   @@index([childId])
 }
 
+// 测评报告
 model AttemptReport {
   id            String   @id @default(cuid())
   attemptId     String   @unique
@@ -89,4 +116,17 @@ model AttemptReport {
   trajectory    Json
   suggestions   Json
   createdAt     DateTime @default(now())
+}
+
+// 用户邀请码池（动态生成的邀请码）
+model UserInviteCode {
+  id          String   @id @default(cuid())
+  userId      String   // 拥有者
+  code        String   @unique
+  usedBy      String?  // 使用者
+  usedAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([code])
 }

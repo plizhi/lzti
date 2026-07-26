@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getStage, getQuestionnaire } from '@/data/questionnaires';
@@ -42,33 +42,110 @@ function isTypeAvailable(questionnaire: Questionnaire, type: QuestionnaireType):
   return questions.length > 0;
 }
 
-export default function AssessmentPage() {
+function AssessmentPageContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const stageId = params.stage as StageId;
   const typeParam = searchParams.get('type') as QuestionnaireType | null;
   const sessionIdParam = searchParams.get('sessionId');
+  const shareId = searchParams.get('share');
+  const slotCode = searchParams.get('slot');
+  const childIdFromShare = searchParams.get('childId');
 
   const stage = getStage(stageId);
   const questionnaire = getQuestionnaire(stageId);
 
   const [sessionId, setSessionId] = useState<string | null>(sessionIdParam);
+  const [childId, setChildId] = useState<string | null>(childIdFromShare);
   const [questionnaireType, setQuestionnaireType] = useState<QuestionnaireType>(
     typeParam && ['student', 'parent', 'teacher'].includes(typeParam) ? typeParam : 'parent'
   );
   const [currentDimensionIndex, setCurrentDimensionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [initError, setInitError] = useState('');
 
+  // 如果有分享链接参数，创建 session
   useEffect(() => {
     if (!stage || !questionnaire) {
       router.push('/');
+      return;
     }
-  }, [stage, questionnaire, router]);
+
+    // 如果已经有 sessionId，不需要再创建
+    if (sessionId) return;
+
+    // 如果没有分享链接参数，不自动创建 session
+    if (!shareId || !slotCode) return;
+
+    // 如果是分享流程，需要 childId
+    if (!childId) {
+      setInitError('无效的测评链接：缺少孩子信息');
+      return;
+    }
+
+    const createSession = async () => {
+      setIsInitializing(true);
+      try {
+        const response = await fetch('/api/assessment/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slotCode, childId }),
+        });
+        const json = await response.json();
+
+        if (!json.success) {
+          setInitError(json.error || '创建测评会话失败');
+          return;
+        }
+
+        setSessionId(json.data.id);
+      } catch (err) {
+        setInitError('创建测评会话失败');
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    createSession();
+  }, [stage, questionnaire, sessionId, shareId, slotCode, childId, router]);
 
   if (!stage || !questionnaire) {
     return null;
+  }
+
+  if (initError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex flex-col">
+        <header className="px-6 py-8 text-center">
+          <h1 className="text-2xl font-bold text-stone-800">测评</h1>
+        </header>
+        <main className="mx-auto w-full max-w-sm px-6 flex-1 flex flex-col items-center justify-center">
+          <div className="p-4 rounded-xl bg-red-50 text-red-600 text-center">
+            <p>{initError}</p>
+          </div>
+          <Link href="/" className="mt-4 text-amber-600 hover:underline">
+            返回首页
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex flex-col">
+        <header className="px-6 py-8 text-center">
+          <h1 className="text-2xl font-bold text-stone-800">测评</h1>
+        </header>
+        <main className="mx-auto w-full max-w-sm px-6 flex-1 flex flex-col items-center justify-center">
+          <div className="animate-spin w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full" />
+          <p className="mt-4 text-stone-500">正在准备测评...</p>
+        </main>
+      </div>
+    );
   }
 
   const allQuestions = getQuestionsForType(questionnaire, questionnaireType);
@@ -290,5 +367,17 @@ export default function AssessmentPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function AssessmentPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full" />
+      </div>
+    }>
+      <AssessmentPageContent />
+    </Suspense>
   );
 }

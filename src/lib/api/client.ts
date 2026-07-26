@@ -41,21 +41,6 @@ async function request<T>(
 
 // Auth
 export const auth = {
-  register: (data: {
-    phone: string;
-    password: string;
-    invitationCode: string;
-    child: { name: string; grade: string; gender?: string; birthDate?: string };
-  }) =>
-    request<{
-      user: { id: string; phone: string; name: string | null; role: string };
-      child: { id: string; name: string };
-      token: string;
-    }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
   login: (data: { phone: string; password: string }) =>
     request<{
       user: { id: string; phone: string; name: string | null; role: string };

@@ -4,7 +4,7 @@ import { ApiError } from '@/lib/api/response';
 
 type ApiHandler<T = unknown> = (
   request: NextRequest,
-  context: { user: { id: string; phone: string; role: string; name: string | null } }
+  context: { user: { id: string; phone: string | null; role: string; name: string | null } }
 ) => Promise<NextResponse<T>>;
 
 export function withAuth<T>(handler: ApiHandler<T>) {
