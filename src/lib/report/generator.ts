@@ -42,12 +42,106 @@ function getDimensionWithQuadrant(dimension: Dimension, quadrantType: QuadrantTy
 export function calculateAttemptScores(
   questionnaire: Questionnaire,
   scoringConfig: ScoringConfig,
-  answers: Record<string, number>
+  answers: Record<string, number>,
+  questionnaireType: 'student' | 'parent' | 'teacher' = 'student'
 ): { scores: DimensionScores; quadrants: DimensionQuadrants } {
-  const questions = questionnaire.studentQuestions ?? questionnaire.questions ?? [];
+  let questions;
+  switch (questionnaireType) {
+    case 'student':
+      questions = questionnaire.studentQuestions ?? questionnaire.questions ?? [];
+      break;
+    case 'parent':
+      questions = questionnaire.parentQuestions ?? questionnaire.questions ?? [];
+      break;
+    case 'teacher':
+      questions = questionnaire.teacherQuestions ?? questionnaire.questions ?? [];
+      break;
+  }
   const { scores } = calculateAllDimensionScores(scoringConfig, questions, answers);
   const quadrants = determineAllQuadrants(scores);
   return { scores, quadrants };
+}
+
+/**
+ * 计算轨迹预测
+ */
+function calculateTrajectory(
+  quadrants: DimensionQuadrants,
+  currentStatus: CurrentStatus[]
+): { riskLevel: 'low' | 'medium' | 'high' | 'critical'; riskCombinations: Array<{ dimensionIds: string[]; riskType: string; description: string }>; predictedPath: string; protectiveFactors: string[] } {
+  const quadrantCount: Record<string, number> = {};
+  const overwhelmedDimensions: string[] = [];
+  const passiveDimensions: string[] = [];
+  const optimalDimensions: string[] = [];
+  const strategyDimensions: string[] = [];
+
+  for (const [dimensionId, quadrant] of Object.entries(quadrants)) {
+    quadrantCount[quadrant] = (quadrantCount[quadrant] || 0) + 1;
+
+    if (quadrant === 'overwhelmed') overwhelmedDimensions.push(dimensionId);
+    else if (quadrant === 'passive') passiveDimensions.push(dimensionId);
+    else if (quadrant === 'optimal') optimalDimensions.push(dimensionId);
+    else if (quadrant === 'strategy') strategyDimensions.push(dimensionId);
+  }
+
+  const total = Object.values(quadrantCount).reduce((a, b) => a + b, 0);
+
+  // 计算风险等级
+  let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+  if (overwhelmedDimensions.length >= 2) riskLevel = 'critical';
+  else if (overwhelmedDimensions.length === 1 && total >= 3) riskLevel = 'high';
+  else if (overwhelmedDimensions.length === 1 || passiveDimensions.length >= 2) riskLevel = 'high';
+  else if (optimalDimensions.length === total) riskLevel = 'low';
+  else if (strategyDimensions.length === total && optimalDimensions.length > 0) riskLevel = 'low';
+
+  // 风险组合
+  const riskCombinations: Array<{ dimensionIds: string[]; riskType: string; description: string }> = [];
+
+  if (overwhelmedDimensions.length > 0) {
+    riskCombinations.push({
+      dimensionIds: overwhelmedDimensions,
+      riskType: 'overwhelmed_risk',
+      description: '多个维度处于被淹没状态，需要优先干预',
+    });
+  }
+
+  if (passiveDimensions.length >= 2) {
+    riskCombinations.push({
+      dimensionIds: passiveDimensions,
+      riskType: 'passive_risk',
+      description: '被动状态维度较多，可能存在动力不足',
+    });
+  }
+
+  // 预测路径
+  let predictedPath = '保持当前趋势发展';
+  if (riskLevel === 'critical') {
+    predictedPath = '如不干预，多维度风险可能相互叠加，形成负向循环';
+  } else if (riskLevel === 'high') {
+    if (overwhelmedDimensions.length > 0) {
+      predictedPath = '存在被淹没维度，需针对性干预避免恶化';
+    } else {
+      predictedPath = '被动状态可能持续，需激发内在动力';
+    }
+  } else if (riskLevel === 'medium') {
+    predictedPath = '整体处于需引导状态，可通过支持性干预改善';
+  } else if (riskLevel === 'low') {
+    predictedPath = '整体状态良好，维持现有方式并关注可持续性';
+  }
+
+  // 保护因素
+  const protectiveFactors: string[] = [];
+  if (optimalDimensions.length > 0) {
+    protectiveFactors.push('存在理想状态维度，可作为恢复的支点');
+  }
+  if (strategyDimensions.length > 0) {
+    protectiveFactors.push('部分维度处于策略引导状态，具有提升空间');
+  }
+  if (protectiveFactors.length === 0 && riskLevel !== 'critical') {
+    protectiveFactors.push('建议发掘孩子的优势维度作为突破口');
+  }
+
+  return { riskLevel, riskCombinations, predictedPath, protectiveFactors };
 }
 
 /**
@@ -60,7 +154,7 @@ export function generateSingleReport(
   attemptId: string,
   questionnaireType: 'student' | 'parent' | 'teacher'
 ): SingleReport {
-  const { scores, quadrants } = calculateAttemptScores(questionnaire, scoringConfig, answers);
+  const { scores, quadrants } = calculateAttemptScores(questionnaire, scoringConfig, answers, questionnaireType);
 
   const currentStatus: CurrentStatus[] = questionnaire.dimensions.map((dimension) => {
     const quadrantType = quadrants[dimension.id] as QuadrantType;
@@ -99,18 +193,16 @@ export function generateSingleReport(
       parentAction: s.parentAction,
     }));
 
+  // 计算轨迹预测
+  const trajectory = calculateTrajectory(quadrants, currentStatus);
+
   return {
     id: crypto.randomUUID(),
     attemptId,
     questionnaireType,
     currentStatus,
     trendAnalysis: null,
-    trajectory: {
-      riskLevel: 'medium',
-      riskCombinations: [],
-      predictedPath: '保持当前趋势发展',
-      protectiveFactors: [],
-    },
+    trajectory,
     suggestions,
     createdAt: new Date(),
   };

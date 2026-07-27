@@ -4,6 +4,7 @@ import { validateStageId, validateQuestionnaireType } from '@/lib/validators';
 import { calculateAllDimensionScores } from '@/lib/scoring/calculator';
 import { determineAllQuadrants } from '@/lib/scoring';
 import { getQuestionnaire } from '@/data/questionnaires';
+import { generateSingleReport } from '@/lib/report/generator';
 import type { Questionnaire, Question, Dimension, ScoringConfig, ScoringAxisConfig } from '@/types/questionnaire';
 import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
@@ -340,24 +341,21 @@ export async function submitAttempt(
   }
 
   // 生成单视角报告
-  const report = {
-    id: crypto.randomUUID(),
-    currentStatus: Object.entries(quadrants).map(([dimensionId, quadrantType]) => ({
-      dimensionId,
-      quadrantType,
-      scores: scores[dimensionId as keyof typeof scores],
-    })),
-    trajectory: { riskLevel: 'medium', riskCombinations: [], predictedPath: '', protectiveFactors: [] },
-    suggestions: [],
-  };
+  const report = generateSingleReport(
+    questionnaire,
+    scoringConfig,
+    data.answers,
+    attemptId,
+    questionnaireType as 'student' | 'parent' | 'teacher'
+  );
 
   // 保存报告
   await prisma.attemptReport.create({
     data: {
       attemptId,
-      currentStatus: report.currentStatus,
-      trajectory: report.trajectory,
-      suggestions: report.suggestions,
+      currentStatus: JSON.parse(JSON.stringify(report.currentStatus)),
+      trajectory: JSON.parse(JSON.stringify(report.trajectory)),
+      suggestions: JSON.parse(JSON.stringify(report.suggestions)),
       trendAnalysis: trendAnalysis ? JSON.parse(JSON.stringify(trendAnalysis)) : undefined,
     },
   });

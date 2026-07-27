@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/lib/auth/middleware';
-import { ApiError } from '@/lib/api/response';
+import { ApiError, apiSuccess } from '@/lib/api/response';
 import { addRateLimitHeaders, rateLimits } from './ratelimit';
 
 type ApiHandler<T = unknown> = (
@@ -38,6 +38,5 @@ export function withAuth<T>(handler: ApiHandler<T>) {
 // 重新导出限流相关的工具
 export { addRateLimitHeaders, rateLimits, checkRateLimit } from './ratelimit';
 
-export function apiSuccess<T>(data: T, status = 200) {
-  return NextResponse.json({ success: true, data }, { status });
-}
+// 重新导出 apiSuccess
+export { apiSuccess };
