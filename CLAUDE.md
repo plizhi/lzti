@@ -150,7 +150,20 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 
 ---
 
-## 十、技术备注
+## 十、生产级改进（2026-07-27）
+
+- [x] 错误处理统一 - apiError 规范化，parseJsonBody 辅助函数
+- [x] JWT_SECRET 生产检查 - 生产环境禁止使用默认值
+- [x] 答案值验证 - validateAnswers 检查 1-5 范围
+- [x] 测试覆盖 - validators.test.ts (20个用例)
+- [x] 健康检查 - /api/health 端点
+- [ ] Sentry 集成 - 待配置 DSN
+- [ ] 安全响应头 - CSP/X-Frame-Options 等
+
+---
+
+## 十一、技术备注
 
 - Prisma 7 需要 `prisma.config.ts` 配置文件
 - 数据库连接使用 `@prisma/adapter-pg` + `pg`
+- 生产环境必须设置非默认的 JWT_SECRET
