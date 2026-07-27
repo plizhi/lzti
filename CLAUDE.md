@@ -157,8 +157,8 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 - [x] 答案值验证 - validateAnswers 检查 1-5 范围
 - [x] 测试覆盖 - validators.test.ts (20个用例)
 - [x] 健康检查 - /api/health 端点
-- [ ] Sentry 集成 - 待配置 DSN
-- [ ] 安全响应头 - CSP/X-Frame-Options 等
+- [x] Sentry 集成 - sentry.*.config.ts 配置文件
+- [x] 安全响应头 - middleware.ts
 
 ---
 
