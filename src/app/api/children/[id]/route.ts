@@ -1,6 +1,14 @@
 import { NextRequest } from 'next/server';
 import { getChild, updateChild, deleteChild } from '@/lib/services/child.service';
 import { withAuth, apiSuccess } from '@/lib/api/handler';
+import { parseJsonBody } from '@/lib/api/response';
+
+interface ChildUpdateBody {
+  name?: string;
+  gender?: string;
+  birthDate?: string;
+  grade?: string;
+}
 
 export const GET = withAuth(async (request, context) => {
   const { searchParams } = new URL(request.url);
@@ -11,7 +19,7 @@ export const GET = withAuth(async (request, context) => {
 
 export const PUT = withAuth(async (request, context) => {
   const id = request.url.split('/').pop()!;
-  const body = await request.json();
+  const body = await parseJsonBody<ChildUpdateBody>(request);
   const child = await updateChild(id, context.user.id, body);
   return apiSuccess(child);
 });

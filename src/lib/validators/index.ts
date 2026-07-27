@@ -87,3 +87,25 @@ export function validateStageId(stageId: unknown): string {
   }
   return stageId;
 }
+
+export function validateAnswers(answers: unknown): Record<string, number> {
+  if (typeof answers !== 'object' || answers === null || Array.isArray(answers)) {
+    throw new ApiError('答案格式错误', 400);
+  }
+
+  const answerMap = answers as Record<string, unknown>;
+
+  for (const [questionId, value] of Object.entries(answerMap)) {
+    if (typeof questionId !== 'string') {
+      throw new ApiError('答案格式错误', 400);
+    }
+    if (typeof value !== 'number') {
+      throw new ApiError('答案值必须是数字', 400);
+    }
+    if (!Number.isInteger(value) || value < 1 || value > 5) {
+      throw new ApiError('答案值必须在1-5之间', 400);
+    }
+  }
+
+  return answerMap as Record<string, number>;
+}

@@ -2,7 +2,13 @@ import { NextRequest } from 'next/server';
 import { submitAttempt } from '@/lib/services/assessment.service';
 import { setPendingAccountExpiration } from '@/lib/services/cleanup.service';
 import { withAuth, apiSuccess } from '@/lib/api/handler';
-import { ApiError } from '@/lib/api/response';
+import { ApiError, apiError, parseJsonBody } from '@/lib/api/response';
+import { validateAnswers, validateQuestionnaireType } from '@/lib/validators';
+
+interface AttemptBody {
+  questionnaireType: unknown;
+  answers: unknown;
+}
 
 // 提交测评答案
 // 支持认证和未认证两种方式：
@@ -15,8 +21,12 @@ export async function POST(request: NextRequest) {
     const sessionIdIndex = pathParts.indexOf('sessions') + 1;
     const sessionId = pathParts[sessionIdIndex];
 
-    const body = await request.json();
+    const body = await parseJsonBody<AttemptBody>(request);
     const authHeader = request.headers.get('Authorization');
+
+    // 验证答案格式
+    const answers = validateAnswers(body.answers);
+    const questionnaireType = validateQuestionnaireType(body.questionnaireType);
 
     let userId: string | null = null;
 
@@ -29,8 +39,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await submitAttempt(sessionId, userId, {
-      questionnaireType: body.questionnaireType,
-      answers: body.answers,
+      questionnaireType,
+      answers,
     });
 
     // 如果是 PENDING 用户，测评完成后设置 2 小时过期
@@ -47,9 +57,9 @@ export async function POST(request: NextRequest) {
     return apiSuccess(result, 201);
   } catch (error) {
     if (error instanceof ApiError) {
-      return apiSuccess({ error: error.message }, error.status as any);
+      return apiError(error.message, error.status);
     }
     console.error('Submit attempt error:', error);
-    return apiSuccess({ error: '提交失败' }, 500);
+    return apiError('提交失败', 500);
   }
 }

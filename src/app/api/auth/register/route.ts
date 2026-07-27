@@ -1,9 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { activateSlotAndCreatePendingUser, completeRegistration } from '@/lib/services/auth.service';
 import { checkRateLimit, addRateLimitHeaders, rateLimits } from '@/lib/api/handler';
-import { ApiError } from '@/lib/api/response';
+import { ApiError, parseJsonBody } from '@/lib/api/response';
 
 const doRateLimit = checkRateLimit(rateLimits.sensitive);
+
+interface SlotBody {
+  slotCode?: string;
+  childName?: string;
+}
+
+interface RegisterBody {
+  userId?: string;
+  phone?: string;
+  password?: string;
+  child?: {
+    name: string;
+    gender?: string;
+    birthDate?: string;
+    grade?: string;
+  };
+}
 
 // 第一步：激活 Slot 并创建预账户
 export async function PUT(request: NextRequest) {
@@ -18,7 +35,7 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body = await parseJsonBody<SlotBody>(request);
     const { slotCode, childName } = body;
 
     if (!slotCode) {
@@ -71,7 +88,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body = await parseJsonBody<RegisterBody>(request);
     const { userId, phone, password, child } = body;
 
     if (!userId || !phone || !password) {
