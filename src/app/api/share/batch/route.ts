@@ -6,7 +6,7 @@ import { ApiError, apiError } from '@/lib/api/response';
 export const POST = withAuth(async (request: NextRequest, context) => {
   try {
     const body = await request.json();
-    const { stageId, questionnaireType, slotCount, expiresInDays } = body;
+    const { childId, stageId, questionnaireType, slotCount, expiresInDays } = body;
 
     if (!stageId || !questionnaireType) {
       return apiError('请提供学段和问卷类型', 400);
@@ -20,23 +20,27 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       context.user.id,
       stageId,
       questionnaireType,
-      slotCount || 10,
+      slotCount || 1,
       expiresInDays || 2
     );
 
+    const slot = batch.slots[0];
+    let shareUrl: string;
+
+    if (questionnaireType === 'register') {
+      shareUrl = `/register?share=${batch.batch.id}&slot=${slot?.code || ''}`;
+    } else {
+      // student or teacher
+      shareUrl = `/assessment/${stageId}/${questionnaireType}?share=${batch.batch.id}&slot=${slot?.code || ''}${childId ? `&childId=${childId}` : ''}`;
+    }
+
     return apiSuccess({
-      batch: {
-        id: batch.batch.id,
-        stageId: batch.batch.stageId,
-        questionnaireType: batch.batch.questionnaireType,
-        expiresAt: batch.batch.expiresAt,
-      },
-      slots: batch.slots.map(slot => ({
-        code: slot.code,
-        type: slot.type,
-        expiresAt: slot.expiresAt,
-      })),
-      shareUrl: `/register?share=${batch.batch.id}&slot=${batch.slots[0]?.code || ''}`,
+      batchId: batch.batch.id,
+      stageId: batch.batch.stageId,
+      questionnaireType: batch.batch.questionnaireType,
+      shareUrl,
+      slotCount: batch.slots.length,
+      expiresAt: batch.batch.expiresAt,
     });
   } catch (error) {
     if (error instanceof ApiError) {

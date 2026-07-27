@@ -6,7 +6,7 @@ import { determineAllQuadrants } from '@/lib/scoring';
 import { getQuestionnaire } from '@/data/questionnaires';
 import type { Questionnaire, Question, Dimension, ScoringConfig, ScoringAxisConfig } from '@/types/questionnaire';
 import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
-import type { QuadrantType } from '@/types/report';
+import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
 
 function buildScoringConfig(
   questionnaire: Questionnaire,
@@ -48,6 +48,71 @@ function buildScoringConfig(
     questionnaireType: 'parent',
     axes,
     reverseQuestions,
+  };
+}
+
+// 获取用户所有孩子的测评历史
+export async function getHistorySessions(userId: string, params?: { childId?: string; stageId?: string; limit?: number }) {
+  const where = {
+    child: { userId },
+    ...(params?.childId && { childId: params.childId }),
+    ...(params?.stageId && { stageId: params.stageId }),
+  };
+
+  const sessions = await prisma.assessmentSession.findMany({
+    where,
+    include: {
+      child: {
+        select: { id: true, name: true, gender: true, birthDate: true, grade: true },
+      },
+      attempts: {
+        select: {
+          id: true,
+          questionnaireType: true,
+          createdAt: true,
+          scores: true,
+          quadrants: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: params?.limit ?? 50,
+  });
+
+  // 获取学段名称
+  const sessionsWithStageName = sessions.map((session) => {
+    const questionnaire = getQuestionnaire(session.stageId);
+    return {
+      id: session.id,
+      stageId: session.stageId,
+      stageName: questionnaire?.name ?? session.stageId,
+      completed: JSON.parse(session.completed),
+      attempts: session.attempts.map((a) => ({
+        id: a.id,
+        questionnaireType: a.questionnaireType,
+        createdAt: a.createdAt,
+        scores: a.scores,
+        quadrants: a.quadrants,
+      })),
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      child: session.child,
+    };
+  });
+
+  // 按孩子分组
+  const childMap = new Map<string, { child: typeof sessionsWithStageName[0]['child']; sessions: typeof sessionsWithStageName }>();
+  for (const session of sessionsWithStageName) {
+    const childId = session.child.id;
+    if (!childMap.has(childId)) {
+      childMap.set(childId, { child: session.child, sessions: [] });
+    }
+    childMap.get(childId)!.sessions.push(session);
+  }
+
+  return {
+    children: Array.from(childMap.values()),
   };
 }
 
@@ -253,6 +318,27 @@ export async function submitAttempt(
 
   const attemptId = attempt.id;
 
+  // 查询上一条同类型 attempt 用于趋势分析
+  const previousAttempt = await prisma.sessionAttempt.findFirst({
+    where: {
+      childId: session.childId,
+      questionnaireType,
+      stageId: session.stageId,
+      id: { not: attemptId },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // 计算趋势分析
+  let trendAnalysis: TrendAnalysis | null = null;
+  if (previousAttempt && questionnaire) {
+    trendAnalysis = calculateTrendAnalysis(
+      scores,
+      previousAttempt.scores as DimensionScores,
+      questionnaire.dimensions
+    );
+  }
+
   // 生成单视角报告
   const report = {
     id: crypto.randomUUID(),
@@ -272,6 +358,7 @@ export async function submitAttempt(
       currentStatus: report.currentStatus,
       trajectory: report.trajectory,
       suggestions: report.suggestions,
+      trendAnalysis: trendAnalysis ? JSON.parse(JSON.stringify(trendAnalysis)) : undefined,
     },
   });
 
@@ -606,4 +693,89 @@ export async function getReport(
   }
 
   throw new ApiError('无效的报告类型', 400);
+}
+
+// 计算趋势分析
+function calculateTrendAnalysis(
+  currentScores: DimensionScores,
+  previousScores: DimensionScores,
+  dimensions: Dimension[]
+): TrendAnalysis {
+  const dimensionTrends: DimensionTrend[] = dimensions.map((dimension) => {
+    const curr = currentScores[dimension.id];
+    const prev = previousScores[dimension.id];
+
+    if (!curr || !prev) {
+      return {
+        dimensionId: dimension.id,
+        dimensionName: dimension.name,
+        change: 0,
+        trend: 'stable',
+        description: '数据不足，无法分析趋势',
+      };
+    }
+
+    const axis1Change = curr.axis1 - prev.axis1;
+    const axis2Change = curr.axis2 - prev.axis2;
+    const totalChange = (axis1Change + axis2Change) / 2;
+
+    let trend: TrendType;
+    if (totalChange >= 0.6) trend = 'significant-up';
+    else if (totalChange >= 0.3) trend = 'up';
+    else if (totalChange <= -0.6) trend = 'significant-down';
+    else if (totalChange <= -0.3) trend = 'down';
+    else trend = 'stable';
+
+    let description: string;
+    switch (trend) {
+      case 'significant-up':
+        description = `${dimension.name}有明显进步`;
+        break;
+      case 'up':
+        description = `${dimension.name}有所改善`;
+        break;
+      case 'significant-down':
+        description = `${dimension.name}明显下降，需关注`;
+        break;
+      case 'down':
+        description = `${dimension.name}有所下降`;
+        break;
+      default:
+        description = `${dimension.name}保持稳定`;
+    }
+
+    return {
+      dimensionId: dimension.id,
+      dimensionName: dimension.name,
+      change: Math.round(totalChange * 100) / 100,
+      trend,
+      description,
+    };
+  });
+
+  // 计算整体趋势
+  const trendWeights: Record<TrendType, number> = {
+    'significant-up': 2,
+    up: 1,
+    stable: 0,
+    down: -1,
+    'significant-down': -2,
+  };
+  const avgTrend =
+    dimensionTrends.reduce((sum, dt) => sum + trendWeights[dt.trend], 0) /
+    dimensionTrends.length;
+
+  let overallTrend: TrendType;
+  if (avgTrend >= 1.5) overallTrend = 'significant-up';
+  else if (avgTrend >= 0.5) overallTrend = 'up';
+  else if (avgTrend <= -1.5) overallTrend = 'significant-down';
+  else if (avgTrend <= -0.5) overallTrend = 'down';
+  else overallTrend = 'stable';
+
+  return {
+    comparedAttemptId: '',
+    comparedAt: new Date().toISOString(),
+    overallTrend,
+    dimensionTrends,
+  };
 }

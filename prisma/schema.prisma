@@ -118,6 +118,21 @@ model AttemptReport {
   createdAt     DateTime @default(now())
 }
 
+// 报告分享
+// 用于生成只读分享链接
+model ReportShare {
+  id          String   @id @default(cuid())
+  attemptId   String   @unique  // 关联 SessionAttempt
+  ownerId     String   // 分享者 userId
+  shareCode   String   @unique  // 8位字母数字码
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([shareCode])
+  @@index([attemptId])
+  @@index([ownerId])
+}
+
 // 用户邀请码池（动态生成的邀请码）
 model UserInviteCode {
   id          String   @id @default(cuid())

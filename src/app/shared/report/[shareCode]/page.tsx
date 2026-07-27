@@ -3,9 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { assessment } from '@/lib/api/client';
-import { ShareReportModal } from '@/components/report/ShareReportModal';
-import './print.css';
 
 const typeLabels: Record<string, string> = {
   student: '学生自评',
@@ -77,33 +74,43 @@ interface ReportData {
   createdAt: string;
 }
 
-export default function ReportPage() {
+interface SharedReportData {
+  report: ReportData;
+  sharedAt: string;
+  expiresAt: string;
+}
+
+export default function SharedReportPage() {
   const params = useParams();
-  const attemptId = params.attemptId as string;
+  const shareCode = params.shareCode as string;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<ReportData | null>(null);
-  const [showShareModal, setShowShareModal] = useState(false);
+  const [data, setData] = useState<SharedReportData | null>(null);
 
-  const fetchReport = useCallback(async () => {
-    if (!attemptId) return;
+  const fetchSharedReport = useCallback(async () => {
+    if (!shareCode) return;
 
     try {
       setLoading(true);
       setError(null);
-      const result = await assessment.getAttemptReport(attemptId) as ReportData;
-      setData(result);
+      const response = await fetch(`/api/share/report/${shareCode}`);
+      const json = await response.json();
+      if (json.success) {
+        setData(json.data);
+      } else {
+        setError(json.error || '获取报告失败');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '获取报告失败');
     } finally {
       setLoading(false);
     }
-  }, [attemptId]);
+  }, [shareCode]);
 
   useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+    fetchSharedReport();
+  }, [fetchSharedReport]);
 
   if (loading) {
     return (
@@ -133,40 +140,43 @@ export default function ReportPage() {
     );
   }
 
-  const { child, stageName, questionnaireType, quadrants, report } = data;
+  const { report, sharedAt, expiresAt } = data;
+  const { child, stageName, questionnaireType, report: reportContent } = report;
+
+  const isExpired = new Date(expiresAt) < new Date();
+
+  if (isExpired) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-amber-50 to-white">
+        <div className="text-center">
+          <div className="text-4xl mb-4">⏰</div>
+          <p className="text-stone-600">此分享链接已过期</p>
+          <Link
+            href="/"
+            className="mt-4 inline-block rounded-xl bg-amber-500 px-6 py-3 font-medium text-white hover:bg-amber-600"
+          >
+            返回首页
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-12">
-      <header className="bg-white/80 backdrop-blur border-b border-stone-200 sticky top-0 z-10">
-        <div className="mx-auto max-w-2xl px-6 py-4">
+      {/* 分享提示 Header */}
+      <header className="bg-amber-50/80 backdrop-blur border-b border-amber-200">
+        <div className="mx-auto max-w-2xl px-6 py-3">
           <div className="flex items-center justify-between">
-            <Link href="/history" className="text-stone-500 hover:text-stone-700">
-              ← 测评历史
+            <span className="text-sm text-amber-700">
+              分享报告 · {new Date(sharedAt).toLocaleDateString('zh-CN')}
+            </span>
+            <Link href="/" className="text-amber-600 hover:text-amber-800 text-sm">
+              返回首页
             </Link>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50"
-              >
-                分享报告
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50"
-              >
-                打印报告
-              </button>
-            </div>
           </div>
         </div>
       </header>
-
-      {showShareModal && data && (
-        <ShareReportModal
-          attemptId={data.attemptId}
-          onClose={() => setShowShareModal(false)}
-        />
-      )}
 
       <main className="mx-auto max-w-2xl px-6 py-8 space-y-6">
         <div className="text-center">
@@ -180,7 +190,7 @@ export default function ReportPage() {
         <div className="rounded-2xl bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-stone-800 mb-4">📍 当下位置</h2>
           <div className="space-y-4">
-            {report?.currentStatus.map((status) => (
+            {reportContent?.currentStatus.map((status) => (
               <div key={status.dimensionId} className="border-b border-stone-100 pb-4 last:border-0 last:pb-0">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-stone-700">
@@ -203,33 +213,31 @@ export default function ReportPage() {
         </div>
 
         {/* 变化趋势 */}
-        {report?.trendAnalysis && (
+        {reportContent?.trendAnalysis && (
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-stone-800 mb-4">
               📈 变化趋势
               <span className="text-sm font-normal text-stone-500 ml-2">
-                (对比 {new Date(report.trendAnalysis.comparedAt).toLocaleDateString('zh-CN')})
+                (对比 {new Date(reportContent.trendAnalysis.comparedAt).toLocaleDateString('zh-CN')})
               </span>
             </h2>
 
             <div className="mb-6 p-4 bg-amber-50 rounded-xl">
               <div className="flex items-center gap-3">
                 <span className="text-3xl">
-                  {trendLabels[report.trendAnalysis.overallTrend]?.icon ?? '→'}
+                  {trendLabels[reportContent.trendAnalysis.overallTrend]?.icon ?? '→'}
                 </span>
                 <div>
                   <p className="font-medium text-stone-800">
-                    {trendLabels[report.trendAnalysis.overallTrend]?.label ?? '稳定'}
+                    {trendLabels[reportContent.trendAnalysis.overallTrend]?.label ?? '稳定'}
                   </p>
-                  <p className="text-sm text-stone-500">
-                    整体趋势
-                  </p>
+                  <p className="text-sm text-stone-500">整体趋势</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3">
-              {report.trendAnalysis.dimensionTrends.map((dt) => (
+              {reportContent.trendAnalysis.dimensionTrends.map((dt) => (
                 <div
                   key={dt.dimensionId}
                   className="flex items-center justify-between p-3 bg-stone-50 rounded-lg"
@@ -262,11 +270,11 @@ export default function ReportPage() {
         )}
 
         {/* 关注建议 */}
-        {report?.suggestions && report.suggestions.length > 0 && (
+        {reportContent?.suggestions && reportContent.suggestions.length > 0 && (
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-stone-800 mb-4">🎯 关注建议</h2>
             <div className="space-y-4">
-              {report.suggestions.map((s) => (
+              {reportContent.suggestions.map((s) => (
                 <div key={s.dimensionId} className="border-l-4 border-amber-400 pl-4">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-medium text-stone-700">{s.dimensionName}</h3>
@@ -296,18 +304,12 @@ export default function ReportPage() {
           </ul>
         </div>
 
-        <div className="flex gap-4">
-          <Link
-            href="/history"
-            className="flex-1 text-center rounded-xl border border-stone-300 py-4 font-medium text-stone-600 transition-colors hover:bg-stone-50"
-          >
-            查看历史
-          </Link>
+        <div className="text-center">
           <Link
             href="/"
-            className="flex-1 text-center rounded-xl bg-amber-500 py-4 font-medium text-white transition-colors hover:bg-amber-600 shadow-md"
+            className="inline-block rounded-xl bg-amber-500 px-8 py-4 font-medium text-white shadow-md hover:bg-amber-600"
           >
-            返回首页
+            开始自己的测评
           </Link>
         </div>
       </main>

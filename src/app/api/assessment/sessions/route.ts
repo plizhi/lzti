@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createSession, createSessionBySlot } from '@/lib/services/assessment.service';
+import { createSession, createSessionBySlot, getHistorySessions } from '@/lib/services/assessment.service';
 import { withAuth, apiSuccess } from '@/lib/api/handler';
 import { ApiError, apiError } from '@/lib/api/response';
 
@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
     // 解析 token 获取用户
     const token = authHeader.slice(7);
     const { verifyToken } = await import('@/lib/auth/jwt');
-    const payload = verifyToken(token);
     const { prisma } = await import('@/lib/db');
+    const payload = verifyToken(token);
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
     });
@@ -55,3 +55,14 @@ export async function POST(request: NextRequest) {
     return apiSuccess({ error: '创建会话失败' }, 500);
   }
 }
+
+// 获取用户所有孩子的测评历史
+export const GET = withAuth(async (request, context) => {
+  const { searchParams } = new URL(request.url);
+  const childId = searchParams.get('childId') ?? undefined;
+  const stageId = searchParams.get('stageId') ?? undefined;
+  const limit = parseInt(searchParams.get('limit') ?? '50', 10);
+
+  const history = await getHistorySessions(context.user.id, { childId, stageId, limit });
+  return apiSuccess(history);
+});

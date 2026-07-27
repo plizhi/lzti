@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { children as childrenApi, auth } from '@/lib/api/client';
+import { SharePanel } from '@/components/children/SharePanel';
 
 interface Child {
   id: string;
@@ -27,6 +28,7 @@ export default function ChildrenPage() {
   const [newChildName, setNewChildName] = useState('');
   const [newChildGrade, setNewChildGrade] = useState('');
   const [error, setError] = useState('');
+  const [sharingChild, setSharingChild] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     loadChildren();
@@ -114,12 +116,20 @@ export default function ChildrenPage() {
                       {child.grade || '未设置年级'}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleDeleteChild(child.id)}
-                    className="text-red-500 hover:text-red-600 text-sm"
-                  >
-                    删除
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSharingChild({ id: child.id, name: child.name })}
+                      className="text-amber-600 hover:text-amber-700 text-sm"
+                    >
+                      分享
+                    </button>
+                    <button
+                      onClick={() => handleDeleteChild(child.id)}
+                      className="text-red-500 hover:text-red-600 text-sm"
+                    >
+                      删除
+                    </button>
+                  </div>
                 </div>
 
                 {child.sessions.length > 0 && (
@@ -212,6 +222,14 @@ export default function ChildrenPage() {
               </form>
             </div>
           </div>
+        )}
+
+        {sharingChild && (
+          <SharePanel
+            childId={sharingChild.id}
+            childName={sharingChild.name}
+            onClose={() => setSharingChild(null)}
+          />
         )}
       </main>
     </div>

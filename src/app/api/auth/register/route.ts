@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { register, activateSlotAndCreatePendingUser, completeRegistration } from '@/lib/services/auth.service';
+import { activateSlotAndCreatePendingUser, completeRegistration } from '@/lib/services/auth.service';
 import { apiSuccess } from '@/lib/api/handler';
 import { ApiError } from '@/lib/api/response';
 

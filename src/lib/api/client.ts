@@ -141,6 +141,70 @@ export const assessment = {
       }>;
     }>(`/assessment/sessions/${sessionId}`),
 
+  getHistorySessions: (params?: { childId?: string; stageId?: string; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.childId) query.set('childId', params.childId);
+    if (params?.stageId) query.set('stageId', params.stageId);
+    if (params?.limit) query.set('limit', String(params.limit));
+    const queryStr = query.toString();
+    return request<{
+      children: Array<{
+        child: { id: string; name: string; gender: string | null; birthDate: string | null; grade: string | null };
+        sessions: Array<{
+          id: string;
+          stageId: string;
+          stageName: string;
+          completed: { parent: boolean; student: boolean; teacher: boolean };
+          attempts: Array<{
+            id: string;
+            questionnaireType: string;
+            createdAt: string;
+            scores: Record<string, { axis1: number; axis2: number }>;
+            quadrants: Record<string, string>;
+          }>;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+      }>;
+    }>(`/assessment/sessions${queryStr ? `?${queryStr}` : ''}`);
+  },
+
+  getAttemptReport: (attemptId: string) =>
+    request<{
+      attemptId: string;
+      sessionId: string;
+      child: { id: string; name: string };
+      stageId: string;
+      stageName: string;
+      questionnaireType: string;
+      scores: Record<string, { axis1: number; axis2: number }>;
+      quadrants: Record<string, string>;
+      report: {
+        id: string;
+        currentStatus: Array<{
+          dimensionId: string;
+          quadrantType: string;
+          scores: { axis1: number; axis2: number };
+        }>;
+        trendAnalysis: {
+          comparedAttemptId: string;
+          comparedAt: string;
+          overallTrend: string;
+          dimensionTrends: Array<{
+            dimensionId: string;
+            dimensionName: string;
+            change: number;
+            trend: string;
+            description: string;
+          }>;
+        } | null;
+        suggestions: Array<unknown>;
+        trajectory: unknown;
+        createdAt: string;
+      } | null;
+      createdAt: string;
+    }>(`/assessment/attempts/${attemptId}/report`),
+
   submitAttempt: (
     sessionId: string,
     data: { questionnaireType: string; answers: Record<string, number> }
@@ -187,6 +251,41 @@ export const invitationCodes = {
       method: 'POST',
       body: JSON.stringify({ code }),
     }),
+};
+
+// Report Share
+export const reportShare = {
+  create: (attemptId: string, expiresInDays?: number) =>
+    request<{
+      shareId: string;
+      shareCode: string;
+      shareUrl: string;
+      expiresAt: string;
+      isExisting: boolean;
+    }>('/share/report', {
+      method: 'POST',
+      body: JSON.stringify({ attemptId, expiresInDays }),
+    }),
+
+  revoke: (shareCode: string) =>
+    request<{ revoked: boolean }>(`/share/report/${shareCode}`, {
+      method: 'DELETE',
+    }),
+
+  list: () =>
+    request<{
+      shares: Array<{
+        shareId: string;
+        shareCode: string;
+        attemptId: string;
+        childName: string;
+        stageName: string;
+        questionnaireType: string;
+        createdAt: string;
+        expiresAt: string;
+        isExpired: boolean;
+      }>;
+    }>('/share/reports'),
 };
 
 // Token management
