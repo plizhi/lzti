@@ -4,12 +4,15 @@ import { getSharedReport, revokeReportShare } from '@/lib/services/report-share.
 import { ApiError } from '@/lib/api/response';
 
 // 获取分享报告（公开接口，无需认证）
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { shareCode: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const result = await getSharedReport(params.shareCode);
+    // 从 URL 提取 shareCode
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split('/');
+    const shareCodeIndex = pathParts.indexOf('report') + 2; // report 后面是 shareCode
+    const shareCode = pathParts[shareCodeIndex];
+
+    const result = await getSharedReport(shareCode);
     return apiSuccess(result);
   } catch (error) {
     if (error instanceof ApiError) {
