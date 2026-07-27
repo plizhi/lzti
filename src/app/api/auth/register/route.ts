@@ -1,56 +1,101 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { activateSlotAndCreatePendingUser, completeRegistration } from '@/lib/services/auth.service';
-import { apiSuccess } from '@/lib/api/handler';
+import { checkRateLimit, addRateLimitHeaders, rateLimits } from '@/lib/api/handler';
 import { ApiError } from '@/lib/api/response';
 
-// 第一步：激活 Slot 并创建预账户（通过分享链接打开注册页时调用）
+const doRateLimit = checkRateLimit(rateLimits.sensitive);
+
+// 第一步：激活 Slot 并创建预账户
 export async function PUT(request: NextRequest) {
+  const rateResult = await doRateLimit(request);
+
+  if (!rateResult.success) {
+    const response = NextResponse.json(
+      { success: false, error: '请求过于频繁，请稍后再试' },
+      { status: 429 }
+    );
+    return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
+  }
+
   try {
     const body = await request.json();
     const { slotCode, childName } = body;
 
     if (!slotCode) {
-      return apiSuccess({ error: '请提供邀请码' }, 400);
+      const response = NextResponse.json(
+        { success: false, error: '请提供邀请码' },
+        { status: 400 }
+      );
+      return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
     }
 
     const result = await activateSlotAndCreatePendingUser(slotCode, childName);
 
-    return apiSuccess({
-      userId: result.user?.id,
-      hasAccount: !!result.user,
-      slot: {
-        code: result.slot.code,
-        type: result.slot.type,
-        expiresAt: result.slot.expiresAt,
+    const response = NextResponse.json({
+      success: true,
+      data: {
+        userId: result.user?.id,
+        hasAccount: !!result.user,
+        slot: {
+          code: result.slot.code,
+          type: result.slot.type,
+          expiresAt: result.slot.expiresAt,
+        },
       },
     });
+    return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
   } catch (error) {
+    let status = 500;
+    let message = '激活失败';
+
     if (error instanceof ApiError) {
-      return apiSuccess({ error: error.message }, error.status as any);
+      status = error.status;
+      message = error.message;
     }
-    console.error('Activate slot error:', error);
-    return apiSuccess({ error: '激活失败' }, 500);
+
+    const response = NextResponse.json({ success: false, error: message }, { status });
+    return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
   }
 }
 
-// 第二步：完成注册（提交手机号+密码时调用）
+// 第二步：完成注册
 export async function POST(request: NextRequest) {
+  const rateResult = await doRateLimit(request);
+
+  if (!rateResult.success) {
+    const response = NextResponse.json(
+      { success: false, error: '请求过于频繁，请稍后再试' },
+      { status: 429 }
+    );
+    return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
+  }
+
   try {
     const body = await request.json();
     const { userId, phone, password, child } = body;
 
     if (!userId || !phone || !password) {
-      return apiSuccess({ error: '请填写完整信息' }, 400);
+      const response = NextResponse.json(
+        { success: false, error: '请填写完整信息' },
+        { status: 400 }
+      );
+      return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
     }
 
     const result = await completeRegistration(userId, phone, password, child);
 
-    return apiSuccess(result);
+    const response = NextResponse.json({ success: true, data: result });
+    return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
   } catch (error) {
+    let status = 500;
+    let message = '注册失败';
+
     if (error instanceof ApiError) {
-      return apiSuccess({ error: error.message }, error.status as any);
+      status = error.status;
+      message = error.message;
     }
-    console.error('Register error:', error);
-    return apiSuccess({ error: '注册失败' }, 500);
+
+    const response = NextResponse.json({ success: false, error: message }, { status });
+    return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getStage, getQuestionnaire } from '@/data/questionnaires';
@@ -66,6 +66,8 @@ function AssessmentPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initError, setInitError] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 如果有分享链接参数，创建 session
   useEffect(() => {
@@ -111,6 +113,64 @@ function AssessmentPageContent() {
 
     createSession();
   }, [stage, questionnaire, sessionId, shareId, slotCode, childId, router]);
+
+  // 加载已保存的进度
+  useEffect(() => {
+    if (!sessionId || !questionnaire) return;
+
+    const loadProgress = async () => {
+      try {
+        const progress = await assessment.getProgress(sessionId, questionnaireType);
+        if (progress.hasProgress && progress.answers) {
+          setAnswers(progress.answers);
+        }
+        if (progress.currentDimensionIndex !== undefined) {
+          setCurrentDimensionIndex(progress.currentDimensionIndex);
+        }
+      } catch (err) {
+        console.error('加载进度失败:', err);
+      }
+    };
+
+    loadProgress();
+  }, [sessionId, questionnaireType, questionnaire]);
+
+  // 自动保存进度
+  const saveProgress = useCallback(async () => {
+    if (!sessionId || !questionnaire) return;
+
+    setSaveStatus('saving');
+    try {
+      await assessment.saveProgress(sessionId, {
+        questionnaireType,
+        answers,
+        currentDimensionIndex,
+      });
+      setSaveStatus('saved');
+    } catch (err) {
+      console.error('保存进度失败:', err);
+      setSaveStatus('error');
+    }
+  }, [sessionId, questionnaireType, answers, currentDimensionIndex, questionnaire]);
+
+  // 防抖保存
+  useEffect(() => {
+    if (Object.keys(answers).length === 0) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      saveProgress();
+    }, 1000);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [answers, currentDimensionIndex, saveProgress]);
 
   if (!stage || !questionnaire) {
     return null;
@@ -225,9 +285,20 @@ function AssessmentPageContent() {
             <Link href="/" className="text-stone-500 hover:text-stone-700">
               ← 返回
             </Link>
-            <span className="text-sm text-stone-500">
-              {currentDimensionIndex + 1} / {questionnaire.dimensions.length}
-            </span>
+            <div className="flex items-center gap-2">
+              {saveStatus === 'saving' && (
+                <span className="text-xs text-stone-400">保存中...</span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="text-xs text-green-600">已保存</span>
+              )}
+              {saveStatus === 'error' && (
+                <span className="text-xs text-red-500">保存失败</span>
+              )}
+              <span className="text-sm text-stone-500">
+                {currentDimensionIndex + 1} / {questionnaire.dimensions.length}
+              </span>
+            </div>
           </div>
 
           <div className="mt-3 flex items-center justify-center gap-2 text-sm">

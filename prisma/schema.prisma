@@ -90,17 +90,22 @@ model AssessmentSession {
 
 // 测评尝试
 model SessionAttempt {
-  id                String        @id @default(cuid())
-  sessionId         String
-  session           AssessmentSession @relation(fields: [sessionId], references: [id])
-  childId           String
-  questionnaireType String
-  stageId           String
-  answers           Json
-  scores            Json
-  quadrants         Json
-  report            AttemptReport?
-  createdAt         DateTime      @default(now())
+  id                    String        @id @default(cuid())
+  sessionId             String
+  session               AssessmentSession @relation(fields: [sessionId], references: [id])
+  childId               String
+  questionnaireType     String
+  stageId               String
+  answers               Json
+  scores                Json
+  quadrants             Json
+  // 中途保存 - 进度
+  progress              Json?         // 存储中途答案 { dimensionId: { questionId: score } }
+  currentDimensionIndex Int?          // 当前维度索引
+  updatedAt             DateTime      @updatedAt
+  // 提交后
+  report                AttemptReport?
+  createdAt             DateTime      @default(now())
 
   @@index([sessionId])
   @@index([childId])

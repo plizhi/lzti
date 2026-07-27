@@ -141,6 +141,27 @@ export const assessment = {
       }>;
     }>(`/assessment/sessions/${sessionId}`),
 
+  saveProgress: (
+    sessionId: string,
+    data: { questionnaireType: string; answers: Record<string, number>; currentDimensionIndex: number }
+  ) =>
+    request<{
+      attemptId: string;
+      saved: boolean;
+      currentDimensionIndex: number;
+    }>(`/assessment/sessions/${sessionId}/progress?sessionId=${sessionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  getProgress: (sessionId: string, questionnaireType: string) =>
+    request<{
+      hasProgress: boolean;
+      attemptId?: string;
+      answers?: Record<string, number>;
+      currentDimensionIndex?: number;
+    }>(`/assessment/sessions/${sessionId}/progress?sessionId=${sessionId}&questionnaireType=${questionnaireType}`),
+
   getHistorySessions: (params?: { childId?: string; stageId?: string; limit?: number }) => {
     const query = new URLSearchParams();
     if (params?.childId) query.set('childId', params.childId);
