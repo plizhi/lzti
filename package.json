@@ -11,7 +11,8 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@prisma/client": "^5.19.0",
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
     "@supabase/supabase-js": "^2.45.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
@@ -19,6 +20,7 @@
     "dexie": "^4.0.8",
     "jsonwebtoken": "^9.0.3",
     "next": "16.2.6",
+    "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "xlsx": "^0.18.5"
@@ -37,7 +39,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",
-    "prisma": "^5.19.0",
+    "prisma": "^7.9.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"
