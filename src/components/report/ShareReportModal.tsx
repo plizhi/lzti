@@ -165,6 +165,11 @@ export function ShareReportModal({ attemptId, onClose }: ShareReportModalProps) 
                   接收方无需登录即可查看此报告的只读版本
                 </p>
               </div>
+
+              {/* 身份认同 */}
+              <p className="text-xs text-stone-400 text-center">
+                分享让关心变得更具体
+              </p>
             </div>
           ) : null}
         </div>

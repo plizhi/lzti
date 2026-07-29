@@ -118,8 +118,8 @@ export function SharePanel({ childId, childName, onClose }: SharePanelProps) {
             <>
               {/* 孩子信息 */}
               <div className="mb-6 p-4 bg-amber-50 rounded-xl">
-                <p className="font-medium text-stone-800">{childName}</p>
-                <p className="text-sm text-stone-600">邀请参与测评</p>
+                <p className="font-medium text-stone-800">{childName}的家长</p>
+                <p className="text-sm text-stone-600">正在用新的视角了解孩子</p>
               </div>
 
               {/* 选择学段 */}
