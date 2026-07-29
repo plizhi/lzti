@@ -109,18 +109,24 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="mt-8 flex gap-4">
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-3 gap-4">
           <Link
             href="/admin/users"
-            className="flex-1 text-center py-4 rounded-xl bg-white shadow-sm font-medium text-stone-600 hover:bg-stone-50"
+            className="text-center py-4 rounded-xl bg-white shadow-sm font-medium text-stone-600 hover:bg-stone-50"
           >
             用户管理
           </Link>
           <Link
             href="/admin/export"
-            className="flex-1 text-center py-4 rounded-xl bg-white shadow-sm font-medium text-stone-600 hover:bg-stone-50"
+            className="text-center py-4 rounded-xl bg-white shadow-sm font-medium text-stone-600 hover:bg-stone-50"
           >
             数据导出
+          </Link>
+          <Link
+            href="/admin/feedback"
+            className="text-center py-4 rounded-xl bg-white shadow-sm font-medium text-stone-600 hover:bg-stone-50"
+          >
+            反馈管理
           </Link>
         </div>
       </main>
