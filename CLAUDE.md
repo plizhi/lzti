@@ -166,14 +166,12 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 - [x] 首页简化 - 移除实时统计展示
 
 ### 待解决问题
-- [ ] `/api/stats` 在 standalone 模式下返回 404（功能正常，但首页暂不使用）
 - [ ] 邮件通知 SMTP 未配置（反馈邮件通知暂不可用）
 - [ ] 企业微信 Webhook 通知（可选，反馈实时通知）
 
 ### 计划中功能
 - [ ] 企微 Webhook 通知 - 有新反馈时推送到群聊
 - [ ] 邮件通知 - 配置 SMTP 后启用
-- [ ] 首页统计展示 - 在稳定环境重新启用 /api/stats
 
 ---
 
