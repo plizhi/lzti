@@ -1,7 +1,7 @@
 # LZTI 学习状态评估系统
 
 > 基于「内在结构养育理论」的学习状态评估工具
-> 更新：2026-07-28
+> 更新：2026-07-29
 
 ---
 
@@ -150,7 +150,34 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 
 ---
 
-## 十、生产级改进（2026-07-27）
+## 十、2026-07-29 本次更新
+
+### 已完成
+- [x] Footer 组件 - 全局页脚（联系信息、隐私政策、服务条款入口）
+- [x] 法律页面 - /privacy、/terms 内容完整
+- [x] 用户反馈系统 - Feedback 模型 + FeedbackButton 组件 + 自动分类
+- [x] 反馈管理后台 - /admin/feedback 页面
+- [x] 快速筛查页面 - /screening/[stage]
+- [x] 报告升级订阅提示 - ReportUpgradePrompt 组件 + 企微二维码
+- [x] 分享报告重构 - SharedReportClient.tsx
+- [x] 公开统计 API - /api/stats（已创建，但首页暂不使用）
+- [x] standalone 部署模式 - ecosystem.config.js 配置正确
+- [x] GitHub 备份 - 已同步到 plizhi/lzti
+- [x] 首页简化 - 移除实时统计展示
+
+### 待解决问题
+- [ ] `/api/stats` 在 standalone 模式下返回 404（功能正常，但首页暂不使用）
+- [ ] 邮件通知 SMTP 未配置（反馈邮件通知暂不可用）
+- [ ] 企业微信 Webhook 通知（可选，反馈实时通知）
+
+### 计划中功能
+- [ ] 企微 Webhook 通知 - 有新反馈时推送到群聊
+- [ ] 邮件通知 - 配置 SMTP 后启用
+- [ ] 首页统计展示 - 在稳定环境重新启用 /api/stats
+
+---
+
+## 十一、生产级改进（2026-07-27）
 
 - [x] 错误处理统一 - apiError 规范化，parseJsonBody 辅助函数
 - [x] JWT_SECRET 生产检查 - 生产环境禁止使用默认值
@@ -162,16 +189,17 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 
 ---
 
-## 十一、技术备注
+## 十二、技术备注
 
 - Prisma 7 需要 `prisma.config.ts` 配置文件
 - 数据库连接使用 `@prisma/adapter-pg` + `pg`
 - 生产环境必须设置非默认的 JWT_SECRET
 - **部署原则**：只操作当前项目进程，不影响其他项目
+- **GitHub 仓库**：https://github.com/plizhi/lzti
 
 ---
 
-## 十二、操作红线
+## 十三、操作红线
 
 1. **不杀其他项目进程** - 只操作当前 lzti 项目的进程
 2. **不修改其他项目代码** - 严格在 `/home/pupeng/projects/lzti` 下工作
