@@ -20,7 +20,7 @@ export const GET = withAuth(async (request: NextRequest, context) => {
     },
   });
 
-  const data = users.map((u) => ({
+  const data = users.map((u: typeof users[number]) => ({
     id: u.id,
     phone: u.phone ?? '',
     status: u.status,

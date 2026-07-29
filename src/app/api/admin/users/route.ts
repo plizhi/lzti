@@ -35,7 +35,7 @@ export const GET = withAuth(async (request, context) => {
   const total = await prisma.user.count();
 
   return apiSuccess({
-    users: users.map((u) => ({
+    users: users.map((u: { id: string; phone: string | null; status: string; role: string; createdAt: Date; children: { length: number } }) => ({
       id: u.id,
       phone: u.phone,
       status: u.status,

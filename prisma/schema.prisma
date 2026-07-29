@@ -149,3 +149,21 @@ model UserInviteCode {
   @@index([userId])
   @@index([code])
 }
+
+// 用户反馈
+model Feedback {
+  id          String    @id @default(cuid())
+  userId      String?
+  content     String
+  category    String    // suggestion / bug / complaint / inquiry
+  status      String    @default("pending") // pending / processing / resolved
+  contact     String?
+  autoReply   String?
+  reply       String?
+  repliedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([category])
+  @@index([status])
+}

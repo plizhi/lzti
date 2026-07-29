@@ -60,7 +60,7 @@ export const GET = withAuth(async (request, context) => {
     totalAttempts,
     todayUsers,
     todayAttempts,
-    sessionsByStage: sessionsByStage.map((s) => ({
+    sessionsByStage: sessionsByStage.map((s: { stageid: string; count: bigint }) => ({
       stageId: s.stageid,
       count: Number(s.count),
     })),

@@ -19,7 +19,7 @@ export const GET = withAuth(async (request: NextRequest, context) => {
     },
   });
 
-  const data = attempts.map((a) => ({
+  const data = attempts.map((a: typeof attempts[number]) => ({
     id: a.id,
     childName: a.session.child.name,
     stageId: a.stageId,

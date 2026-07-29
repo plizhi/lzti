@@ -2,8 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'lzti',
-      script: 'npm',
-      args: 'start',
+      script: '.next/standalone/server.js',
       cwd: './',
       instances: 1,
       autorestart: true,
