@@ -167,3 +167,12 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 - Prisma 7 需要 `prisma.config.ts` 配置文件
 - 数据库连接使用 `@prisma/adapter-pg` + `pg`
 - 生产环境必须设置非默认的 JWT_SECRET
+- **部署原则**：只操作当前项目进程，不影响其他项目
+
+---
+
+## 十二、操作红线
+
+1. **不杀其他项目进程** - 只操作当前 lzti 项目的进程
+2. **不修改其他项目代码** - 严格在 `/home/pupeng/projects/lzti` 下工作
+3. **关注自己代码质量** - 确保改动正确后再提交

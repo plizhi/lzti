@@ -6,22 +6,15 @@ import { useRouter } from 'next/navigation';
 import { getAllStages } from '@/data/questionnaires';
 import { auth, removeToken, isLoggedIn } from '@/lib/api/client';
 
-interface Stats {
-  totalUsers: number;
-  totalAttempts: number;
-}
-
 export default function Home() {
   const router = useRouter();
   const stages = getAllStages();
   const [loggedIn, setLoggedIn] = useState(false);
   const [user, setUser] = useState<{ name: string | null; children: any[] } | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
     checkAuth();
-    fetchStats();
   }, []);
 
   const checkAuth = async () => {
@@ -42,25 +35,6 @@ export default function Home() {
     setLoggedIn(false);
     setUser(null);
     setShowUserMenu(false);
-  };
-
-  const fetchStats = async () => {
-    try {
-      const res = await fetch('/api/stats');
-      const json = await res.json();
-      if (json.success) {
-        setStats(json.data);
-      }
-    } catch {
-      // 静默失败，不影响页面显示
-    }
-  };
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'k+';
-    }
-    return num.toString();
   };
 
   return (
@@ -129,33 +103,22 @@ export default function Home() {
 
       <main className="mx-auto max-w-2xl px-6 pb-12">
         {!loggedIn && (
-          <>
-            <div className="mb-6 rounded-2xl bg-gradient-to-r from-amber-100 to-orange-100 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-amber-800">用3分钟，看见孩子的学习状态</h3>
-                  <p className="text-sm text-amber-700 mt-1">
-                    不看分数，看本质——基于内在结构养育理论
-                  </p>
-                </div>
-                <Link
-                  href="/screening/primary-low"
-                  className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-600 transition-colors"
-                >
-                  开始探索
-                </Link>
-              </div>
-            </div>
-
-            {stats && (
-              <div className="mb-4 rounded-xl bg-white p-3 shadow-sm text-center">
-                <p className="text-sm text-stone-600">
-                  已有 <span className="font-semibold text-amber-600">{formatNumber(stats.totalUsers)}</span> 位家长参与，
-                  完成 <span className="font-semibold text-amber-600">{formatNumber(stats.totalAttempts)}</span> 次测评
+          <div className="mb-6 rounded-2xl bg-gradient-to-r from-amber-100 to-orange-100 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-amber-800">用3分钟，看见孩子的学习状态</h3>
+                <p className="text-sm text-amber-700 mt-1">
+                  不看分数，看本质——基于内在结构养育理论
                 </p>
               </div>
-            )}
-          </>
+              <Link
+                href="/screening/primary-low"
+                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-600 transition-colors"
+              >
+                开始探索
+              </Link>
+            </div>
+          </div>
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
