@@ -10,6 +10,7 @@ import { middleSchoolQuestionnaire } from '@/data/questionnaires/middle-school';
 import { junior3Questionnaire } from '@/data/questionnaires/junior-3';
 import { senior1Questionnaire } from '@/data/questionnaires/senior-1';
 import { senior3Questionnaire } from '@/data/questionnaires/senior-3';
+import { isLoggedIn } from '@/lib/api/client';
 import type { StageId, Questionnaire } from '@/types';
 
 const questionnaires: Record<string, Questionnaire> = {
@@ -57,6 +58,11 @@ export default function ScreeningPage() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [isComplete, setIsComplete] = useState(false);
   const [results, setResults] = useState<ScreeningResult[]>([]);
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setLoggedIn(isLoggedIn());
+  }, []);
 
   useEffect(() => {
     if (!stage || !questionnaire) {
@@ -179,6 +185,28 @@ export default function ScreeningPage() {
               返回首页
             </Link>
           </div>
+
+          {!loggedIn && (
+            <div className="mt-6 p-4 rounded-xl bg-stone-50 border border-stone-200">
+              <p className="text-sm text-stone-600 text-center mb-3">
+                登录后可保存筛查结果，获取持续追踪
+              </p>
+              <div className="flex gap-3">
+                <Link
+                  href="/login"
+                  className="flex-1 rounded-lg bg-amber-500 py-2.5 text-center text-sm font-medium text-white hover:bg-amber-600"
+                >
+                  登录
+                </Link>
+                <Link
+                  href="/register"
+                  className="flex-1 rounded-lg border border-amber-500 py-2.5 text-center text-sm font-medium text-amber-600 hover:bg-amber-50"
+                >
+                  注册
+                </Link>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     );
