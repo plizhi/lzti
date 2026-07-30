@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { assessment } from '@/lib/api/client';
 import { ShareReportModal } from '@/components/report/ShareReportModal';
 import { ReportUpgradePrompt } from '@/components/report/ReportUpgradePrompt';
+import { TrendChart } from '@/components/report/TrendChart';
+import type { TrendType } from '@/types/report';
 import './print.css';
 
 const typeLabels: Record<string, string> = {
@@ -21,14 +23,6 @@ const quadrantLabels: Record<string, string> = {
   overwhelmed: 'bg-red-100 text-red-700',
 };
 
-const trendLabels: Record<string, { icon: string; label: string }> = {
-  'up': { icon: '↑', label: '提升' },
-  'stable': { icon: '→', label: '稳定' },
-  'down': { icon: '↓', label: '下降' },
-  'significant-up': { icon: '⬆⬆', label: '显著提升' },
-  'significant-down': { icon: '⬇⬇', label: '显著下降' },
-};
-
 interface CurrentStatusItem {
   dimensionId: string;
   quadrantType: string;
@@ -42,7 +36,7 @@ interface TrendDimension {
   dimensionId: string;
   dimensionName: string;
   change: number;
-  trend: string;
+  trend: TrendType;
   description: string;
 }
 
@@ -61,7 +55,7 @@ interface ReportData {
     trendAnalysis: {
       comparedAttemptId: string;
       comparedAt: string;
-      overallTrend: string;
+      overallTrend: TrendType;
       dimensionTrends: TrendDimension[];
     } | null;
     suggestions: Array<{
@@ -208,57 +202,8 @@ export default function ReportPage() {
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-stone-800 mb-4">
               📈 变化趋势
-              <span className="text-sm font-normal text-stone-500 ml-2">
-                (对比 {new Date(report.trendAnalysis.comparedAt).toLocaleDateString('zh-CN')})
-              </span>
             </h2>
-
-            <div className="mb-6 p-4 bg-amber-50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">
-                  {trendLabels[report.trendAnalysis.overallTrend]?.icon ?? '→'}
-                </span>
-                <div>
-                  <p className="font-medium text-stone-800">
-                    {trendLabels[report.trendAnalysis.overallTrend]?.label ?? '稳定'}
-                  </p>
-                  <p className="text-sm text-stone-500">
-                    整体趋势
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {report.trendAnalysis.dimensionTrends.map((dt) => (
-                <div
-                  key={dt.dimensionId}
-                  className="flex items-center justify-between p-3 bg-stone-50 rounded-lg"
-                >
-                  <div>
-                    <span className="font-medium text-stone-700">{dt.dimensionName}</span>
-                    <p className="text-xs text-stone-400">{dt.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <span
-                      className={`text-lg font-semibold ${
-                        dt.change > 0
-                          ? 'text-green-600'
-                          : dt.change < 0
-                            ? 'text-red-600'
-                            : 'text-stone-500'
-                      }`}
-                    >
-                      {dt.change >= 0 ? '+' : ''}
-                      {dt.change.toFixed(2)}
-                    </span>
-                    <p className="text-xs text-stone-400">
-                      {trendLabels[dt.trend]?.label ?? dt.trend}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <TrendChart trendAnalysis={report.trendAnalysis} />
           </div>
         )}
 
