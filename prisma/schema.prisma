@@ -18,9 +18,21 @@ model User {
   role          String    @default("PARENT")
   shareBatchId  String?   // 来自哪个分享批次
   children      Child[]
+
+  // 分享相关
+  shareCode      String?   @unique  // 用户的唯一分享码
+  bonusAttempts  Int      @default(0)  // 通过分享获得的额外测评次数
+  bonusUsed      Int      @default(0)  // 已使用的分享奖励次数
+
   createdAt     DateTime  @default(now())
   expiresAt     DateTime? // PENDING 状态过期时间（测评完成后2小时）
   updatedAt     DateTime  @updatedAt
+
+  // 关联
+  subscriptions Subscription[]
+  payments      Payment[]
+  referralReceived Referral[] @relation("Referrer")
+  shareRewards  ShareReward[]
 }
 
 // 分享批次
@@ -166,4 +178,115 @@ model Feedback {
   @@index([userId])
   @@index([category])
   @@index([status])
+}
+
+// ============================================
+// 会员订阅系统
+// ============================================
+
+// 订阅表
+model Subscription {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan           String   // "yearly"
+  status         String   // "active" | "expired" | "cancelled"
+  attemptsTotal  Int      @default(12)   // 年度总次数
+  attemptsUsed   Int      @default(0)    // 已使用次数
+  startsAt       DateTime
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId])
+  @@index([userId])
+  @@index([status])
+}
+
+// 支付记录
+model Payment {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  amount         Int       // 分（19900 = 199元）
+  currency       String    @default("CNY")
+  status         String    // "pending" | "completed" | "failed" | "refunded"
+  provider       String    // "stripe" | "gumroad" | "manual"
+  transactionId  String?   // 第三方流水号
+  paymentUrl     String?   // 支付页面 URL
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId])
+  @@index([transactionId])
+  @@index([status])
+}
+
+// 复测提醒
+model ReTestReminder {
+  id          String    @id @default(cuid())
+  userId      String
+  childId     String
+  attemptId   String    // 基于哪个测评
+  remindAt    DateTime  // 计划提醒时间
+  sentAt      DateTime? // 实际发送时间
+  channel     String    @default("in_app") // "in_app" | "wechat" | "sms" | "email"
+  status      String    @default("pending") // "pending" | "sent" | "failed" | "cancelled"
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, remindAt])
+  @@index([status])
+}
+
+// ============================================
+// 分享激励机制
+// ============================================
+
+// 邀请关系（核心）
+model Referral {
+  id              String    @id @default(cuid())
+  referrerId      String    // 分享者
+  referrer        User      @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  refereeId       String?   // 被分享者（注册后填充）
+  shareCode       String    // 分享码
+  referredAt      DateTime  @default(now())  // 被分享时间
+
+  // 奖励状态
+  rewardRegistered  Boolean   @default(false) // 注册奖励已发放
+  rewardAssessed   Boolean   @default(false) // 测评奖励已发放
+  rewardSubscribed Boolean   @default(false) // 订阅奖励已发放
+
+  createdAt       DateTime  @default(now())
+
+  @@index([referrerId])
+  @@index([refereeId])
+  @@index([shareCode])
+}
+
+// 分享奖励记录
+model ShareReward {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referralId  String
+  type        String   // "registered" | "assessed" | "subscribed"
+  bonusCount  Int      // 奖励次数（1或3）
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([referralId])
+}
+
+// 分享记录日志
+model ShareLog {
+  id          String   @id @default(cuid())
+  userId      String
+  shareCode   String   // 使用的分享码
+  childId     String?  // 被分享的孩子ID（如果有）
+  type        String   // "link" | "poster" | "qrcode"
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([shareCode])
 }

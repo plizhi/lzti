@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, TokenPayload } from './jwt';
 import { prisma } from '@/lib/db';
+import { getMembershipStatus, type MembershipStatus } from '@/lib/services/membership.service';
 
 export interface AuthContext {
   user: {
@@ -9,6 +10,7 @@ export interface AuthContext {
     role: string;
     name: string | null;
   };
+  membership: MembershipStatus;
 }
 
 export async function authMiddleware(request: NextRequest): Promise<AuthContext | null> {
@@ -31,7 +33,10 @@ export async function authMiddleware(request: NextRequest): Promise<AuthContext 
       return null;
     }
 
-    return { user };
+    // 获取会员状态
+    const membership = await getMembershipStatus(user.id);
+
+    return { user, membership };
   } catch {
     return null;
   }
