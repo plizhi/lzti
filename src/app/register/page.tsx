@@ -10,6 +10,7 @@ function RegisterPageContent() {
   const searchParams = useSearchParams();
   const shareId = searchParams.get('share');
   const slotCode = searchParams.get('slot');
+  const referralCode = searchParams.get('ref');
 
   const [step, setStep] = useState(1);
   const [userId, setUserId] = useState<string | null>(null);
@@ -18,6 +19,23 @@ function RegisterPageContent() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [initError, setInitError] = useState('');
+
+  // 在 step 2 时从 localStorage 获取 referralCode
+  const [storedRefCode, setStoredRefCode] = useState<string | null>(null);
+
+  // 存储 referralCode 到 localStorage（如果有的话）
+  useEffect(() => {
+    if (referralCode) {
+      localStorage.setItem('referralCode', referralCode);
+      setStoredRefCode(referralCode);
+    } else {
+      // 如果没有 URL 参数，尝试从 localStorage 获取
+      const stored = localStorage.getItem('referralCode');
+      if (stored) {
+        setStoredRefCode(stored);
+      }
+    }
+  }, [referralCode]);
 
   // 初始化：激活 Slot 并创建预账户
   useEffect(() => {
@@ -62,7 +80,7 @@ function RegisterPageContent() {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, phone, password }),
+        body: JSON.stringify({ userId, phone, password, referralCode: storedRefCode }),
       });
       const json = await response.json();
 
@@ -70,6 +88,9 @@ function RegisterPageContent() {
         setError(json.error || '注册失败');
         return;
       }
+
+      // 注册成功后清除 referralCode
+      localStorage.removeItem('referralCode');
 
       setToken(json.data.token);
       router.push('/');

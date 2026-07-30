@@ -3,6 +3,7 @@ import { hashPassword, comparePassword, generateToken } from '@/lib/auth';
 import { validatePhone, validatePassword, validateChildData } from '@/lib/validators';
 import { ApiError } from '@/lib/api/response';
 import { activateSlot, createUserInviteCodes } from './share.service';
+import { onReferralRegistered } from './referral.service';
 
 export interface LoginData {
   phone: string;
@@ -55,7 +56,8 @@ export async function completeRegistration(
     gender?: string;
     birthDate?: string;
     grade?: string;
-  }
+  },
+  referralCode?: string | null
 ) {
   // 验证手机号格式
   const validatedPhone = validatePhone(phone);
@@ -115,6 +117,11 @@ export async function completeRegistration(
 
   // 赠送邀请码
   const inviteCodes = await createUserInviteCodes(updatedUser.id, 10);
+
+  // 处理推荐奖励
+  if (referralCode) {
+    await onReferralRegistered(updatedUser.id, referralCode);
+  }
 
   return {
     user: {

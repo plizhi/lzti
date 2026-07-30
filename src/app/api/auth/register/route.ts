@@ -20,6 +20,7 @@ interface RegisterBody {
     birthDate?: string;
     grade?: string;
   };
+  referralCode?: string;
 }
 
 // 第一步：激活 Slot 并创建预账户
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await parseJsonBody<RegisterBody>(request);
-    const { userId, phone, password, child } = body;
+    const { userId, phone, password, child, referralCode } = body;
 
     if (!userId || !phone || !password) {
       const response = NextResponse.json(
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
       return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
     }
 
-    const result = await completeRegistration(userId, phone, password, child);
+    const result = await completeRegistration(userId, phone, password, child, referralCode);
 
     const response = NextResponse.json({ success: true, data: result });
     return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);

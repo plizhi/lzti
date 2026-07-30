@@ -5,6 +5,7 @@ import { calculateAllDimensionScores } from '@/lib/scoring/calculator';
 import { determineAllQuadrants } from '@/lib/scoring';
 import { getQuestionnaire } from '@/data/questionnaires';
 import { generateSingleReport } from '@/lib/report/generator';
+import { onReferralAssessed } from './referral.service';
 import type { Questionnaire, Question, Dimension, ScoringConfig, ScoringAxisConfig } from '@/types/questionnaire';
 import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
@@ -368,6 +369,11 @@ export async function submitAttempt(
     where: { id: sessionId },
     data: { completed: JSON.stringify(completed) },
   });
+
+  // 触发推荐奖励：如果被邀请注册的用户完成了测评，给分享者加奖励
+  if (userId) {
+    onReferralAssessed(userId).catch(console.error);
+  }
 
   return {
     attemptId,
