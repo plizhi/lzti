@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ReferralPanel } from '@/components/share/ReferralPanel';
+import { ReminderPanel } from '@/components/share/ReminderPanel';
 
 interface MembershipStatus {
   hasSubscription: boolean;
@@ -150,6 +151,12 @@ export default function MembershipPage() {
         <div className="rounded-2xl bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-stone-800 mb-4">邀请奖励</h2>
           <ReferralPanel />
+        </div>
+
+        {/* 复测提醒 */}
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-stone-800 mb-4">复测提醒</h2>
+          <ReminderPanel />
         </div>
 
         {/* 历史记录入口 */}
