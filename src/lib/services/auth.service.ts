@@ -196,6 +196,15 @@ export async function getCurrentUser(userId: string) {
     throw new ApiError('用户不存在', 404);
   }
 
+  // 获取订阅状态
+  const subscription = await prisma.subscription.findUnique({
+    where: { userId },
+  });
+
+  const isActive = subscription?.status === 'active' &&
+    subscription?.expiresAt &&
+    subscription.expiresAt > new Date();
+
   return {
     id: user.id,
     phone: user.phone,
@@ -203,5 +212,14 @@ export async function getCurrentUser(userId: string) {
     role: user.role,
     status: user.status,
     children: user.children,
+    // 会员信息
+    bonusAttempts: user.bonusAttempts,
+    bonusUsed: user.bonusUsed,
+    subscription: isActive ? {
+      status: subscription!.status,
+      expiresAt: subscription!.expiresAt,
+      attemptsTotal: subscription!.attemptsTotal,
+      attemptsUsed: subscription!.attemptsUsed,
+    } : null,
   };
 }
