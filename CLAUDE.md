@@ -1,7 +1,7 @@
 # LZTI 学习状态评估系统
 
 > 基于「内在结构养育理论」的学习状态评估工具
-> 更新：2026-07-29
+> 更新：2026-07-30
 
 ---
 
@@ -127,7 +127,7 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 
 | 表 | 说明 |
 |---|------|
-| User | 用户，含 status (PENDING/ACTIVE) |
+| User | 用户，含 status (PENDING/ACTIVE)、shareCode、bonusAttempts、bonusUsed |
 | ShareBatch | 分享批次 |
 | Slot | 邀请槽位 |
 | Child | 孩子档案 |
@@ -135,6 +135,22 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 | SessionAttempt | 测评尝试 |
 | AttemptReport | 测评报告 |
 | UserInviteCode | 用户邀请码池 |
+
+### 会员订阅表
+
+| 表 | 说明 |
+|---|------|
+| Subscription | 订阅表（plan、status、attemptsTotal、attemptsUsed） |
+| Payment | 支付记录（amount、status、provider、transactionId） |
+| ReTestReminder | 复测提醒（userId、childId、remindAt、status） |
+
+### 分享激励表
+
+| 表 | 说明 |
+|---|------|
+| Referral | 邀请关系（referrerId、refereeId、rewardRegistered/Assessed/Subscribed） |
+| ShareReward | 分享奖励记录（type、bonusCount） |
+| ShareLog | 分享日志（shareCode、type） |
 
 ---
 
@@ -175,7 +191,40 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 
 ---
 
-## 十一、生产级改进（2026-07-27）
+## 十一、2026-07-30 会员体系升级
+
+### 已完成
+- [x] 数据库变更 - Subscription、Payment、ReTestReminder、Referral、ShareReward、ShareLog 表
+- [x] 权益检查中间件 - membership.service.ts 实现
+- [x] 分享激励机制 - 注册+1、测评+1（追加）、订阅+3（追加）
+- [x] 趋势对比功能 - TrendChart 组件，增强趋势展示
+- [x] 复测提醒系统 - 测评完成后30天自动创建提醒
+- [x] 会员中心页面 - /membership 展示会员状态和邀请奖励
+- [x] 季度成长摘要 - quarterly-summary.service.ts 生成3个月数据汇总
+- [x] 分享海报优化 - ShareReportModal 增强，显示孩子信息、象限标签
+- [x] ReferralPanel 组件 - 展示分享码、邀请统计、奖励记录
+
+### 新增 API
+| 路由 | 说明 |
+|------|------|
+| /api/share/code | 获取/记录分享码 |
+| /api/share/rewards | 获取分享奖励统计 |
+| /api/reminders | 获取复测提醒 |
+| /api/quarterly-summary | 获取季度成长摘要 |
+
+### 安全修复
+- [x] 防止自己推荐自己
+- [x] 推荐奖励年度上限（每年最多24次）
+- [x] useQuota 并发安全（事务保证原子性）
+
+### 待接入（支付相关）
+- [ ] 订阅次数限制（当前暂时全部开放）
+- [ ] 会员专属功能 gating
+- [ ] 支付回调处理（Stripe/Gumroad）
+
+---
+
+## 十二、生产级改进（2026-07-27）
 
 - [x] 错误处理统一 - apiError 规范化，parseJsonBody 辅助函数
 - [x] JWT_SECRET 生产检查 - 生产环境禁止使用默认值
@@ -187,7 +236,7 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 
 ---
 
-## 十二、技术备注
+## 十三、技术备注
 
 - Prisma 7 需要 `prisma.config.ts` 配置文件
 - 数据库连接使用 `@prisma/adapter-pg` + `pg`
@@ -197,7 +246,7 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 
 ---
 
-## 十三、操作红线
+## 十四、操作红线
 
 1. **不杀其他项目进程** - 只操作当前 lzti 项目的进程
 2. **不修改其他项目代码** - 严格在 `/home/pupeng/projects/lzti` 下工作
