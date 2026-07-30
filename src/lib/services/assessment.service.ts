@@ -10,6 +10,30 @@ import type { Questionnaire, Question, Dimension, ScoringConfig, ScoringAxisConf
 import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
 
+/**
+ * 创建复测提醒
+ * 在测评完成后调用，创建30天后的提醒记录
+ */
+async function createReTestReminder(
+  userId: string,
+  childId: string,
+  attemptId: string
+) {
+  const remindAt = new Date();
+  remindAt.setDate(remindAt.getDate() + 30); // 30天后提醒
+
+  return prisma.reTestReminder.create({
+    data: {
+      userId,
+      childId,
+      attemptId,
+      remindAt,
+      channel: 'in_app',
+      status: 'pending',
+    },
+  });
+}
+
 function buildScoringConfig(
   questionnaire: Questionnaire,
   questions: Question[]
@@ -373,6 +397,12 @@ export async function submitAttempt(
   // 触发推荐奖励：如果被邀请注册的用户完成了测评，给分享者加奖励
   if (userId) {
     onReferralAssessed(userId).catch(console.error);
+  }
+
+  // 创建复测提醒：30天后提醒
+  // 只在家长测评完成时创建提醒
+  if (userId && questionnaireType === 'parent') {
+    createReTestReminder(userId, session.childId, attemptId).catch(console.error);
   }
 
   return {
