@@ -6,6 +6,7 @@ import { determineAllQuadrants } from '@/lib/scoring';
 import { getQuestionnaire } from '@/data/questionnaires';
 import { generateSingleReport } from '@/lib/report/generator';
 import { onReferralAssessed } from './referral.service';
+import { useQuota } from './membership.service';
 import type { Questionnaire, Question, Dimension, ScoringConfig, ScoringAxisConfig } from '@/types/questionnaire';
 import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
@@ -397,6 +398,11 @@ export async function submitAttempt(
   // 触发推荐奖励：如果被邀请注册的用户完成了测评，给分享者加奖励
   if (userId) {
     onReferralAssessed(userId).catch(console.error);
+  }
+
+  // 使用测评次数
+  if (userId) {
+    useQuota(userId).catch(console.error);
   }
 
   // 创建复测提醒：30天后提醒
