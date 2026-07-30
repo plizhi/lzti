@@ -77,10 +77,13 @@ function RegisterPageContent() {
     setLoading(true);
 
     try {
+      // 直接从 localStorage 获取，避免 state 同步延迟问题
+      const refCode = localStorage.getItem('referralCode');
+
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, phone, password, referralCode: storedRefCode }),
+        body: JSON.stringify({ userId, phone, password, referralCode: refCode }),
       });
       const json = await response.json();
 

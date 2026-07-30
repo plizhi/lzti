@@ -122,41 +122,52 @@ export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
 /**
  * 使用一次测评次数
  * 优先使用订阅次数，再使用分享奖励次数
+ * 使用事务保证原子性，避免并发超发
  * 返回是否成功
  */
 export async function useQuota(userId: string): Promise<boolean> {
-  // 优先使用订阅次数
-  const subscription = await prisma.subscription.findFirst({
-    where: {
-      userId,
-      status: 'active',
-      expiresAt: { gt: new Date() },
-    },
-  });
+  try {
+    // 使用事务保证原子性
+    const result = await prisma.$transaction(async (tx) => {
+      // 优先使用订阅次数
+      const subscription = await tx.subscription.findFirst({
+        where: {
+          userId,
+          status: 'active',
+          expiresAt: { gt: new Date() },
+        },
+      });
 
-  if (subscription && subscription.attemptsUsed < subscription.attemptsTotal) {
-    await prisma.subscription.update({
-      where: { id: subscription.id },
-      data: { attemptsUsed: { increment: 1 } },
+      if (subscription && subscription.attemptsUsed < subscription.attemptsTotal) {
+        await tx.subscription.update({
+          where: { id: subscription.id },
+          data: { attemptsUsed: { increment: 1 } },
+        });
+        return { success: true, source: 'subscription' };
+      }
+
+      // 其次使用分享奖励次数
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (user && user.bonusUsed < user.bonusAttempts) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { bonusUsed: { increment: 1 } },
+        });
+        return { success: true, source: 'bonus' };
+      }
+
+      return { success: false, source: null };
     });
+
+    return result.success;
+  } catch (error) {
+    console.error('useQuota error:', error);
+    // 暂时对所有用户开放
     return true;
   }
-
-  // 其次使用分享奖励次数
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-
-  if (user && user.bonusUsed < user.bonusAttempts) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { bonusUsed: { increment: 1 } },
-    });
-    return true;
-  }
-
-  // 暂时对所有用户开放
-  return true;
 }
 
 /**

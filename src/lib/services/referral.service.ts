@@ -121,6 +121,20 @@ export async function getShareStats(userId: string) {
 
 // 新用户注册时调用：创建/更新 Referral
 export async function onReferralRegistered(refereeId: string, shareCode: string) {
+  // 防止自己推荐自己
+  const referrer = await prisma.user.findUnique({
+    where: { shareCode },
+    select: { id: true },
+  });
+
+  if (!referrer) {
+    return null; // 无效的分享码
+  }
+
+  if (referrer.id === refereeId) {
+    return null; // 不能自己推荐自己
+  }
+
   // 查找是否存在未关联的 Referral
   const existing = await prisma.referral.findFirst({
     where: { shareCode, refereeId: null },
@@ -136,15 +150,6 @@ export async function onReferralRegistered(refereeId: string, shareCode: string)
   }
 
   // 创建新记录
-  const referrer = await prisma.user.findUnique({
-    where: { shareCode },
-    select: { id: true },
-  });
-
-  if (!referrer) {
-    return null; // 无效的分享码
-  }
-
   return prisma.referral.create({
     data: {
       referrerId: referrer.id,
@@ -228,14 +233,21 @@ export async function onReferralSubscribed(refereeId: string) {
     return null;
   }
 
-  // 检查是否达到年度上限（订阅奖励不计入上限，但要有合理限制）
-  const referrer = await prisma.user.findUnique({
-    where: { id: referral.referrerId },
-    select: { bonusAttempts: true },
+  // 检查是否达到年度上限（订阅奖励也有限制，防止刷）
+  const yearStart = new Date();
+  yearStart.setMonth(0, 1);
+  yearStart.setHours(0, 0, 0, 0);
+
+  const thisYearRewards = await prisma.shareReward.count({
+    where: {
+      userId: referral.referrerId,
+      createdAt: { gte: yearStart },
+    },
   });
 
-  if (!referrer) {
-    return null;
+  // 订阅奖励上限：每年最多通过推荐获得 24 次（订阅奖励 + 注册/测评奖励）
+  if (thisYearRewards >= 24) {
+    return { reachedLimit: true };
   }
 
   // 发放 +3 奖励
