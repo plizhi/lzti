@@ -73,6 +73,13 @@ export default function Home() {
                 >
                   📋 测评历史
                 </Link>
+                <Link
+                  href="/membership"
+                  onClick={() => setShowUserMenu(false)}
+                  className="block px-4 py-2 text-stone-700 hover:bg-stone-50"
+                >
+                  👤 我的
+                </Link>
                 <hr className="my-2 border-stone-100" />
                 <button
                   onClick={handleLogout}
