@@ -40,6 +40,17 @@ export async function createReportShare(
     throw new ApiError('报告不存在', 404);
   }
 
+  // 获取问卷信息
+  const questionnaire = getQuestionnaire(attempt.stageId);
+
+  // 获取象限标签
+  const quadrants = attempt.quadrants as Record<string, string>;
+  const quadrantLabels = attempt.report?.currentStatus
+    ? (attempt.report.currentStatus as Array<{ dimensionId: string; quadrantType: string; quadrantName?: string }>)
+        .map((s) => s.quadrantName ?? s.quadrantType)
+        .slice(0, 3) // 最多显示3个
+    : [];
+
   // 检查是否已有分享
   const existing = await prisma.reportShare.findUnique({
     where: { attemptId },
@@ -53,6 +64,11 @@ export async function createReportShare(
       shareUrl: `/shared/report/${existing.shareCode}`,
       expiresAt: existing.expiresAt,
       isExisting: true,
+      // 附加信息
+      childName: attempt.session.child.name,
+      stageName: questionnaire?.name,
+      quadrantLabels,
+      assessedAt: attempt.createdAt,
     };
   }
 
@@ -76,6 +92,11 @@ export async function createReportShare(
     shareUrl: `/shared/report/${share.shareCode}`,
     expiresAt: share.expiresAt,
     isExisting: false,
+    // 附加信息
+    childName: attempt.session.child.name,
+    stageName: questionnaire?.name,
+    quadrantLabels,
+    assessedAt: attempt.createdAt,
   };
 }
 

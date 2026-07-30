@@ -6,6 +6,7 @@ import { assessment } from '@/lib/api/client';
 interface ShareReportModalProps {
   attemptId: string;
   onClose: () => void;
+  isMember?: boolean;
 }
 
 interface ShareData {
@@ -14,9 +15,13 @@ interface ShareData {
   shareUrl: string;
   expiresAt: string;
   isExisting: boolean;
+  childName?: string;
+  stageName?: string;
+  quadrantLabels?: string[];
+  assessedAt?: string;
 }
 
-export function ShareReportModal({ attemptId, onClose }: ShareReportModalProps) {
+export function ShareReportModal({ attemptId, onClose, isMember = false }: ShareReportModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareData, setShareData] = useState<ShareData | null>(null);
@@ -115,6 +120,42 @@ export function ShareReportModal({ attemptId, onClose }: ShareReportModalProps) 
             </div>
           ) : shareData ? (
             <div className="space-y-6">
+              {/* 报告信息头部 */}
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  {shareData.childName && (
+                    <span className="text-lg font-semibold text-stone-800">
+                      {shareData.childName}
+                    </span>
+                  )}
+                  {isMember && (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                      会员
+                    </span>
+                  )}
+                </div>
+                {shareData.stageName && (
+                  <p className="text-sm text-stone-500">{shareData.stageName}</p>
+                )}
+                {shareData.quadrantLabels && shareData.quadrantLabels.length > 0 && (
+                  <div className="flex items-center justify-center gap-1 mt-2 flex-wrap">
+                    {shareData.quadrantLabels.map((label, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 bg-stone-100 text-stone-600 text-xs rounded-full"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {shareData.assessedAt && (
+                  <p className="text-xs text-stone-400 mt-2">
+                    测评时间：{formatDate(shareData.assessedAt)}
+                  </p>
+                )}
+              </div>
+
               {/* 二维码 */}
               <div className="flex justify-center">
                 <div className="p-2 bg-white rounded-xl shadow-sm">
