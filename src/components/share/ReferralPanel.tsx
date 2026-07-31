@@ -9,8 +9,8 @@ interface ShareStats {
     totalShared: number;
     validReferrals: number;
     totalReferrals: number;
-    bonusEarned: number;
-    bonusUsed: number;
+    realPoints: number;
+    bonusPoints: number;
     bonusRemaining: number;
   };
   recentReferrals: Array<{
@@ -18,7 +18,6 @@ interface ShareStats {
     referredAt: string;
     registered: boolean;
     assessed: boolean;
-    subscribed: boolean;
     rewardsEarned: number;
   }>;
 }
@@ -163,7 +162,7 @@ export function ReferralPanel() {
       <div className="grid grid-cols-3 gap-3">
         <div className="p-3 bg-white rounded-xl text-center border border-stone-200">
           <p className="text-2xl font-bold text-amber-600">{stats.stats.bonusRemaining}</p>
-          <p className="text-xs text-stone-500">剩余奖励</p>
+          <p className="text-xs text-stone-500">可用积分</p>
         </div>
         <div className="p-3 bg-white rounded-xl text-center border border-stone-200">
           <p className="text-2xl font-bold text-stone-600">{stats.stats.validReferrals}</p>
@@ -175,13 +174,22 @@ export function ReferralPanel() {
         </div>
       </div>
 
+      {/* 积分余额 */}
+      <div className="p-4 bg-amber-50 rounded-xl">
+        <p className="text-sm font-medium text-amber-800 mb-2">积分余额</p>
+        <div className="flex justify-between text-sm">
+          <span className="text-stone-600">实际积分：{stats.stats.realPoints}</span>
+          <span className="text-stone-600">奖励积分：{stats.stats.bonusPoints}</span>
+        </div>
+      </div>
+
       {/* 奖励说明 */}
       <div className="p-4 bg-stone-50 rounded-xl">
         <p className="text-sm font-medium text-stone-700 mb-2">邀请奖励</p>
         <ul className="text-sm text-stone-600 space-y-1">
-          <li>• 被分享者注册成功：<span className="text-amber-600 font-medium">+1次</span></li>
-          <li>• 被分享者完成测评：<span className="text-amber-600 font-medium">+1次</span></li>
-          <li>• 被分享者付费订阅：<span className="text-amber-600 font-medium">+3次</span></li>
+          <li>• 被邀请人注册+测评：<span className="text-amber-600 font-medium">+5积分</span></li>
+          <li>• 被邀请人后续测评：<span className="text-amber-600 font-medium">+3积分/次</span></li>
+          <li>• 10积分兑换荔心卷，15积分兑换升学指数</li>
         </ul>
       </div>
 
@@ -210,11 +218,6 @@ export function ReferralPanel() {
                   {referral.assessed && (
                     <span className="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs rounded-full">
                       已测评
-                    </span>
-                  )}
-                  {referral.subscribed && (
-                    <span className="px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded-full">
-                      已付费
                     </span>
                   )}
                   <span className="text-amber-600 text-sm font-medium">

@@ -1,4 +1,10 @@
 import { prisma } from '@/lib/db';
+import {
+  earnPoints,
+  getPointBalance,
+  createTrialCoupon,
+  type PointBalance,
+} from './point.service';
 
 // 生成8位字母数字分享码
 export async function generateShareCode(): Promise<string> {
@@ -65,37 +71,37 @@ export async function logShare(
 
 // 获取用户的分享统计
 export async function getShareStats(userId: string) {
-  const [shareCode, shareLogs, referrals, user] = await Promise.all([
+  const [shareCode, shareLogs, referrals] = await Promise.all([
     getOrCreateShareCode(userId),
     prisma.shareLog.count({ where: { userId } }),
     prisma.referral.findMany({
       where: { referrerId: userId },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { bonusAttempts: true, bonusUsed: true },
-    }),
   ]);
 
-  // 统计有效邀请（注册）
-  const validReferrals = referrals.filter(r => r.rewardRegistered);
-
-  // 计算奖励
-  let totalBonusEarned = 0;
-  let totalBonusUsed = 0;
-
-  for (const referral of referrals) {
-    if (referral.rewardSubscribed) {
-      totalBonusEarned += 3;
-    } else if (referral.rewardAssessed) {
-      totalBonusEarned += 2; // 注册 + 测评
-    } else if (referral.rewardRegistered) {
-      totalBonusEarned += 1;
-    }
+  // 获取积分余额
+  let pointBalance: PointBalance;
+  try {
+    pointBalance = await getPointBalance(userId);
+  } catch {
+    pointBalance = {
+      realPoints: 0,
+      bonusPoints: 0,
+      bonusPointsUsed: 0,
+      totalUsable: 0,
+    };
   }
 
-  const bonusRemaining = (user?.bonusAttempts ?? 0) - (user?.bonusUsed ?? 0);
+  // 统计有效邀请（已注册）
+  const validReferrals = referrals.filter((r) => r.rewardRegistered);
+
+  // 计算已获得的积分
+  let totalPointsEarned = 0;
+  for (const referral of referrals) {
+    if (referral.rewardRegistered) totalPointsEarned += 5;
+    if (referral.rewardAssessed) totalPointsEarned += 3;
+  }
 
   return {
     shareCode,
@@ -104,22 +110,24 @@ export async function getShareStats(userId: string) {
       totalShared: shareLogs,
       validReferrals: validReferrals.length,
       totalReferrals: referrals.length,
-      bonusEarned: user?.bonusAttempts ?? 0,
-      bonusUsed: user?.bonusUsed ?? 0,
-      bonusRemaining,
+      realPoints: pointBalance.realPoints,
+      bonusPoints: pointBalance.bonusPoints,
+      bonusRemaining: pointBalance.totalUsable,
     },
-    recentReferrals: referrals.slice(0, 10).map(r => ({
+    recentReferrals: referrals.slice(0, 10).map((r) => ({
       id: r.id,
       referredAt: r.referredAt,
       registered: r.rewardRegistered,
       assessed: r.rewardAssessed,
-      subscribed: r.rewardSubscribed,
-      rewardsEarned: (r.rewardSubscribed ? 3 : 0) + (r.rewardAssessed && !r.rewardSubscribed ? 2 : 0) + (r.rewardRegistered && !r.rewardAssessed ? 1 : 0),
+      rewardsEarned: (r.rewardRegistered ? 5 : 0) + (r.rewardAssessed ? 3 : 0),
     })),
   };
 }
 
-// 新用户注册时调用：创建/更新 Referral
+/**
+ * 新用户注册时调用：创建/更新 Referral，发放注册积分奖励
+ * 被推荐人注册+首次家长测评 = 推荐人得5积分
+ */
 export async function onReferralRegistered(refereeId: string, shareCode: string) {
   // 防止自己推荐自己
   const referrer = await prisma.user.findUnique({
@@ -141,27 +149,46 @@ export async function onReferralRegistered(refereeId: string, shareCode: string)
     orderBy: { createdAt: 'desc' },
   });
 
+  let referral;
   if (existing) {
     // 更新已有记录
-    return prisma.referral.update({
+    referral = await prisma.referral.update({
       where: { id: existing.id },
       data: { refereeId },
     });
+  } else {
+    // 创建新记录
+    referral = await prisma.referral.create({
+      data: {
+        referrerId: referrer.id,
+        refereeId,
+        shareCode,
+      },
+    });
   }
 
-  // 创建新记录
-  return prisma.referral.create({
-    data: {
-      referrerId: referrer.id,
-      refereeId,
-      shareCode,
-    },
-  });
+  // 检查是否已发放过注册积分奖励（避免重复发放）
+  // 注意：这里只发5积分的注册奖励，测评奖励在onReferralAssessed中发
+  if (!referral.rewardRegistered) {
+    // 发放 +5 实际积分给推荐人
+    await earnPoints(referrer.id, 'register', referral.id);
+
+    // 更新奖励状态
+    await prisma.referral.update({
+      where: { id: referral.id },
+      data: { rewardRegistered: true },
+    });
+  }
+
+  return referral;
 }
 
-// 被分享者完成测评时调用：发放测评奖励
+/**
+ * 被推荐人完成家长测评时调用：发放测评积分奖励
+ * 后续家长测评 = 推荐人得3积分/次
+ */
 export async function onReferralAssessed(refereeId: string) {
-  // 查找该用户关联的未发放测评奖励的 Referral
+  // 查找该用户关联的、已注册但未发放测评积分的 Referral
   const referral = await prisma.referral.findFirst({
     where: { refereeId, rewardRegistered: true, rewardAssessed: false },
     orderBy: { createdAt: 'asc' },
@@ -171,59 +198,25 @@ export async function onReferralAssessed(refereeId: string) {
     return null;
   }
 
-  // 检查是否达到年度上限（每人每年最多12次分享奖励）
-  const referrer = await prisma.user.findUnique({
-    where: { id: referral.referrerId },
-    select: { bonusAttempts: true },
+  // 发放 +3 实际积分给推荐人
+  await earnPoints(referral.referrerId, 'assessment', referral.id);
+
+  // 更新奖励状态
+  await prisma.referral.update({
+    where: { id: referral.id },
+    data: { rewardAssessed: true },
   });
 
-  if (!referrer) {
-    return null;
-  }
-
-  // 检查今年获得的分享奖励
-  const yearStart = new Date();
-  yearStart.setMonth(0, 1);
-  yearStart.setHours(0, 0, 0, 0);
-
-  const thisYearRewards = await prisma.shareReward.count({
-    where: {
-      userId: referral.referrerId,
-      createdAt: { gte: yearStart },
-      type: { not: 'subscribed' }, // 订阅奖励不计入上限
-    },
-  });
-
-  if (thisYearRewards >= 12) {
-    // 达到上限，不再发放
-    return { reachedLimit: true };
-  }
-
-  // 发放 +1 奖励
-  const [, , shareReward] = await prisma.$transaction([
-    prisma.referral.update({
-      where: { id: referral.id },
-      data: { rewardAssessed: true },
-    }),
-    prisma.user.update({
-      where: { id: referral.referrerId },
-      data: { bonusAttempts: { increment: 1 } },
-    }),
-    prisma.shareReward.create({
-      data: {
-        userId: referral.referrerId,
-        referralId: referral.id,
-        type: 'assessed',
-        bonusCount: 1,
-      },
-    }),
-  ]);
-
-  return shareReward;
+  return { success: true };
 }
 
-// 被分享者完成付费订阅时调用：发放订阅奖励
+/**
+ * 被推荐人完成付费订阅时调用：发放订阅奖励
+ * - 推荐人已订阅：+1个月订阅期 + 1次测评
+ * - 推荐人未订阅：+1次测评机会（15天有效期，TR-券）
+ */
 export async function onReferralSubscribed(refereeId: string) {
+  // 查找该用户关联的、未发放订阅奖励的 Referral
   const referral = await prisma.referral.findFirst({
     where: { refereeId, rewardSubscribed: false },
     orderBy: { createdAt: 'asc' },
@@ -233,71 +226,97 @@ export async function onReferralSubscribed(refereeId: string) {
     return null;
   }
 
-  // 检查是否达到年度上限（订阅奖励也有限制，防止刷）
-  const yearStart = new Date();
-  yearStart.setMonth(0, 1);
-  yearStart.setHours(0, 0, 0, 0);
-
-  const thisYearRewards = await prisma.shareReward.count({
+  // 检查推荐人是否在订阅期内
+  const subscription = await prisma.subscription.findFirst({
     where: {
       userId: referral.referrerId,
-      createdAt: { gte: yearStart },
+      status: 'active',
+      expiresAt: { gt: new Date() },
     },
   });
 
-  // 订阅奖励上限：每年最多通过推荐获得 24 次（订阅奖励 + 注册/测评奖励）
-  if (thisYearRewards >= 24) {
-    return { reachedLimit: true };
-  }
+  if (subscription) {
+    // 推荐人已在订阅期内：给+1个月订阅期 + 1次测评
+    const newExpiresAt = new Date(subscription.expiresAt);
+    newExpiresAt.setMonth(newExpiresAt.getMonth() + 1);
 
-  // 发放 +3 奖励
-  const [, , shareReward] = await prisma.$transaction([
-    prisma.referral.update({
+    await prisma.$transaction([
+      // 延长订阅期1个月
+      prisma.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          expiresAt: newExpiresAt,
+          attemptsTotal: { increment: 1 },
+        },
+      }),
+      // 更新奖励状态
+      prisma.referral.update({
+        where: { id: referral.id },
+        data: { rewardSubscribed: true },
+      }),
+    ]);
+
+    return {
+      success: true,
+      rewardType: 'subscription_extension',
+      bonusMonths: 1,
+      bonusAttempts: 1,
+    };
+  } else {
+    // 推荐人未在订阅期内：给15天有效期的trial券
+    const { code, expiresAt } = await createTrialCoupon(
+      referral.referrerId,
+      referral.id
+    );
+
+    // 更新奖励状态
+    await prisma.referral.update({
       where: { id: referral.id },
       data: { rewardSubscribed: true },
-    }),
-    prisma.user.update({
-      where: { id: referral.referrerId },
-      data: { bonusAttempts: { increment: 3 } },
-    }),
-    prisma.shareReward.create({
-      data: {
-        userId: referral.referrerId,
-        referralId: referral.id,
-        type: 'subscribed',
-        bonusCount: 3,
-      },
-    }),
-  ]);
+    });
 
-  return shareReward;
+    return {
+      success: true,
+      rewardType: 'trial_voucher',
+      code,
+      expiresAt,
+      description: '有效期15天的一次完整测评（家长+孩子+老师三视角）',
+    };
+  }
 }
 
-// 获取分享奖励详情
+// 获取分享奖励详情（积分形式）
 export async function getShareRewards(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { bonusAttempts: true, bonusUsed: true },
-  });
+  let pointBalance: PointBalance;
+  try {
+    pointBalance = await getPointBalance(userId);
+  } catch {
+    pointBalance = {
+      realPoints: 0,
+      bonusPoints: 0,
+      bonusPointsUsed: 0,
+      totalUsable: 0,
+    };
+  }
 
-  const rewards = await prisma.shareReward.findMany({
-    where: { userId },
-    include: {
-      // referral: true,
+  const transactions = await prisma.pointTransaction.findMany({
+    where: {
+      userId,
+      type: { in: ['earn_register', 'earn_assessment', 'bonus_earned'] },
     },
     orderBy: { createdAt: 'desc' },
     take: 50,
   });
 
   return {
-    bonusAttempts: user?.bonusAttempts ?? 0,
-    bonusUsed: user?.bonusUsed ?? 0,
-    bonusRemaining: (user?.bonusAttempts ?? 0) - (user?.bonusUsed ?? 0),
-    rewards: rewards.map(r => ({
-      id: r.id,
-      type: r.type,
-      bonusCount: r.bonusCount,
-      createdAt: r.createdAt,
+    realPoints: pointBalance.realPoints,
+    bonusPoints: pointBalance.bonusPoints,
+    bonusRemaining: pointBalance.totalUsable,
+    transactions: transactions.map((t) => ({
+      id: t.id,
+      type: t.type,
+      amount: t.amount,
+      createdAt: t.createdAt,
     })),
   };
 }

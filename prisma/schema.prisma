@@ -21,8 +21,13 @@ model User {
 
   // 分享相关
   shareCode      String?   @unique  // 用户的唯一分享码
-  bonusAttempts  Int      @default(0)  // 通过分享获得的额外测评次数
-  bonusUsed      Int      @default(0)  // 已使用的分享奖励次数
+  bonusAttempts  Int      @default(0)  // 通过分享获得的额外测评次数（保留兼容）
+  bonusUsed      Int      @default(0)  // 已使用的分享奖励次数（保留兼容）
+
+  // 积分体系
+  realPoints     Int      @default(0)    // 实际积分
+  bonusPoints    Int      @default(0)    // 奖励积分（已付费用户满10奖2）
+  bonusPointsUsed Int     @default(0)    // 已使用的奖励积分
 
   createdAt     DateTime  @default(now())
   expiresAt     DateTime? // PENDING 状态过期时间（测评完成后2小时）
@@ -33,6 +38,8 @@ model User {
   payments      Payment[]
   referralReceived Referral[] @relation("Referrer")
   shareRewards  ShareReward[]
+  pointTransactions PointTransaction[]
+  coupons       Coupon[]
 }
 
 // 分享批次
@@ -91,9 +98,14 @@ model AssessmentSession {
   stageId   String
   completed String           @default("{\"parent\":false,\"student\":false,\"teacher\":false}")
   slotId    String?         // 通过哪个 Slot 创建
+  couponId  String?          // 使用的券ID（荔心卷/升学指数/trial）
   attempts  SessionAttempt[]
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
+
+  @@index([childId])
+  @@index([slotId])
+  @@index([couponId])
 
   @@index([childId])
   @@index([slotId])
@@ -252,10 +264,10 @@ model Referral {
   shareCode       String    // 分享码
   referredAt      DateTime  @default(now())  // 被分享时间
 
-  // 奖励状态
-  rewardRegistered  Boolean   @default(false) // 注册奖励已发放
-  rewardAssessed   Boolean   @default(false) // 测评奖励已发放
-  rewardSubscribed Boolean   @default(false) // 订阅奖励已发放
+  // 积分奖励状态
+  pointsRegistered Boolean   @default(false) // 注册积分奖励已发放（+5积分）
+  pointsAssessed   Boolean   @default(false) // 测评积分奖励已发放（+3积分/次）
+  rewardSubscribed Boolean   @default(false) // 订阅奖励已发放（+1月/+1次测评/trial券）
 
   createdAt       DateTime  @default(now())
 
@@ -289,4 +301,44 @@ model ShareLog {
 
   @@index([userId])
   @@index([shareCode])
+}
+
+// ============================================
+// 积分体系
+// ============================================
+
+// 积分流水
+model PointTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // earn_register | earn_assessment | redeem_lixin | redeem_shengxue | bonus_earned
+  amount      Int      // 正数=获得，负数=消耗
+  balance     Int      // 变动后的余额
+  description String?  // 说明
+  relatedId   String?  // 关联ID
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// 券（荔心卷/升学指数/trial试用）
+model Coupon {
+  id          String   @id @default(cuid())
+  code        String   @unique  // 券码，如 LX-XXXXXXXX、TR-XXXXXXXX
+  type        String   // lixin | shengxue | trial
+  status      String   @default("active") // active | used | expired
+  userId      String?  // 拥有者
+  user        User?    @relation(fields: [userId], references: [id])
+  usedBy      String?  // 使用者
+  usedAt      DateTime?
+  sessionId   String?  // 关联的测评session
+  expiresAt   DateTime // 过期时间
+  createdAt   DateTime @default(now())
+
+  @@index([code])
+  @@index([userId])
+  @@index([status])
 }
