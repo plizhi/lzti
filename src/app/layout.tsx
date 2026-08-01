@@ -15,8 +15,8 @@ const notoSansSC = Noto_Sans_SC({
 });
 
 export const metadata: Metadata = {
-  title: "学习状态评估",
-  description: "基于内在结构养育理论的多维度学习状态评估系统",
+  title: "荔枝测评 | 荔学卷",
+  description: "基于内在结构养育理论，帮助家长看见真实的孩子，在合适的时机给合适的支持",
 };
 
 export default function RootLayout({

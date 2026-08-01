@@ -1,7 +1,7 @@
-# LZTI 学习状态评估系统
+# 荔枝测评 | 荔学卷
 
 > 基于「内在结构养育理论」的学习状态评估工具
-> 更新：2026-07-30
+> 更新：2026-08-01
 
 ---
 
@@ -10,6 +10,8 @@
 帮助家长评估孩子的学习状态，生成个性化分析报告和引导建议。
 
 **核心理念**：学业问题的底层是心智，心神不稳，再多外力也只是治标不治本。
+
+**产品名称**：荔枝测评 | 荔学卷
 
 ---
 
@@ -243,6 +245,23 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 - 生产环境必须设置非默认的 JWT_SECRET
 - **部署原则**：只操作当前项目进程，不影响其他项目
 - **GitHub 仓库**：https://github.com/plizhi/lzti
+
+### 部署架构（2026-08-01 更新）
+
+- **进程管理**：systemd（不再使用 PM2）
+- **工作目录**：`/home/pupeng/projects/lzti`
+- **systemd 服务**：`/etc/systemd/system/lzti.service`
+- **服务命令**：`systemctl start/restart/status lzti`
+- **港服代理**：47.243.75.164 → 8.147.63.208:3000
+
+### 部署流程
+
+```bash
+cd /home/pupeng/projects/lzti
+git pull
+npm run build
+systemctl restart lzti
+```
 
 ---
 
