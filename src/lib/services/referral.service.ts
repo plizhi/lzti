@@ -94,13 +94,13 @@ export async function getShareStats(userId: string) {
   }
 
   // 统计有效邀请（已注册）
-  const validReferrals = referrals.filter((r) => r.rewardRegistered);
+  const validReferrals = referrals.filter((r) => r.pointsRegistered);
 
   // 计算已获得的积分
   let totalPointsEarned = 0;
   for (const referral of referrals) {
-    if (referral.rewardRegistered) totalPointsEarned += 5;
-    if (referral.rewardAssessed) totalPointsEarned += 3;
+    if (referral.pointsRegistered) totalPointsEarned += 5;
+    if (referral.pointsAssessed) totalPointsEarned += 3;
   }
 
   return {
@@ -117,9 +117,9 @@ export async function getShareStats(userId: string) {
     recentReferrals: referrals.slice(0, 10).map((r) => ({
       id: r.id,
       referredAt: r.referredAt,
-      registered: r.rewardRegistered,
-      assessed: r.rewardAssessed,
-      rewardsEarned: (r.rewardRegistered ? 5 : 0) + (r.rewardAssessed ? 3 : 0),
+      registered: r.pointsRegistered,
+      assessed: r.pointsAssessed,
+      rewardsEarned: (r.pointsRegistered ? 5 : 0) + (r.pointsAssessed ? 3 : 0),
     })),
   };
 }
@@ -169,14 +169,14 @@ export async function onReferralRegistered(refereeId: string, shareCode: string)
 
   // 检查是否已发放过注册积分奖励（避免重复发放）
   // 注意：这里只发5积分的注册奖励，测评奖励在onReferralAssessed中发
-  if (!referral.rewardRegistered) {
+  if (!referral.pointsRegistered) {
     // 发放 +5 实际积分给推荐人
     await earnPoints(referrer.id, 'register', referral.id);
 
     // 更新奖励状态
     await prisma.referral.update({
       where: { id: referral.id },
-      data: { rewardRegistered: true },
+      data: { pointsRegistered: true },
     });
   }
 
@@ -190,7 +190,7 @@ export async function onReferralRegistered(refereeId: string, shareCode: string)
 export async function onReferralAssessed(refereeId: string) {
   // 查找该用户关联的、已注册但未发放测评积分的 Referral
   const referral = await prisma.referral.findFirst({
-    where: { refereeId, rewardRegistered: true, rewardAssessed: false },
+    where: { refereeId, pointsRegistered: true, pointsAssessed: false },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -204,7 +204,7 @@ export async function onReferralAssessed(refereeId: string) {
   // 更新奖励状态
   await prisma.referral.update({
     where: { id: referral.id },
-    data: { rewardAssessed: true },
+    data: { pointsAssessed: true },
   });
 
   return { success: true };

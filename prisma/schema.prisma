@@ -106,9 +106,6 @@ model AssessmentSession {
   @@index([childId])
   @@index([slotId])
   @@index([couponId])
-
-  @@index([childId])
-  @@index([slotId])
 }
 
 // 测评尝试

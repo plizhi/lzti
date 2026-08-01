@@ -40,7 +40,8 @@ function RegisterPageContent() {
   // 初始化：激活 Slot 并创建预账户
   useEffect(() => {
     if (!shareId || !slotCode) {
-      setInitError('无效的注册链接');
+      setInitError('');
+      setStep(0); // 表示是直接访问，需要邀请码
       return;
     }
 
@@ -103,6 +104,49 @@ function RegisterPageContent() {
       setLoading(false);
     }
   };
+
+  // 直接访问注册页（无邀请码）
+  if (step === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex flex-col">
+        <header className="px-6 py-8 text-center">
+          <h1 className="text-2xl font-bold text-stone-800">注册</h1>
+        </header>
+        <main className="mx-auto w-full max-w-sm px-6 flex-1 flex flex-col items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 mx-auto bg-amber-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-stone-800">需要邀请码才能注册</h2>
+            <p className="text-stone-500 text-sm leading-relaxed">
+              我们的测评服务采用邀请制，请联系您的邀请人获取邀请码。
+            </p>
+          </div>
+
+          <div className="mt-8 w-full space-y-3">
+            <a
+              href="mailto:contact@lizhi-eval.com?subject=申请邀请码&body=您好，我想申请试用荔枝测评，请发送邀请码给我。%0A%0A姓名：%0A联系方式："
+              className="block w-full py-3 rounded-xl bg-amber-500 text-white font-medium text-center hover:bg-amber-600 transition"
+            >
+              邮件申请邀请码
+            </a>
+            <Link
+              href="/login"
+              className="block w-full py-3 rounded-xl border border-stone-300 text-stone-700 font-medium text-center hover:bg-stone-50 transition"
+            >
+              已有账号？登录
+            </Link>
+          </div>
+
+          <Link href="/" className="mt-8 text-stone-500 hover:text-stone-700">
+            ← 返回首页
+          </Link>
+        </main>
+      </div>
+    );
+  }
 
   // 初始化失败
   if (initError) {
