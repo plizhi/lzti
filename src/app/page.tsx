@@ -119,10 +119,12 @@ export default function Home() {
                 </p>
               </div>
               <Link
-                href="/screening/primary-low"
+                href="https://nzyy.cc"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-600 transition-colors"
               >
-                开始探索
+                了解更多
               </Link>
             </div>
           </div>
