@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { getAllStages } from '@/data/questionnaires';
 import { auth, removeToken, isLoggedIn } from '@/lib/api/client';
 
 export default function Home() {
-  const router = useRouter();
   const stages = getAllStages();
   const [loggedIn, setLoggedIn] = useState(false);
   const [user, setUser] = useState<{ name: string | null; children: any[] } | null>(null);
@@ -38,11 +36,12 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
-      <header className="px-6 py-8 flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50">
+      {/* Header */}
+      <header className="px-6 py-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">学习状态评估</h1>
-          <p className="mt-2 text-stone-500">选择孩子的学段开始测评</p>
+          <h1 className="text-xl font-bold text-stone-800">荔枝测评</h1>
+          <p className="text-sm text-stone-500">一骑红尘笑，荔途自扶摇</p>
         </div>
 
         {loggedIn ? (
@@ -94,7 +93,7 @@ export default function Home() {
           <div className="flex gap-2">
             <Link
               href="/login"
-              className="px-4 py-2 rounded-full text-amber-700 hover:bg-amber-100 transition"
+              className="px-4 py-2 rounded-full text-stone-600 hover:bg-amber-100 transition"
             >
               登录
             </Link>
@@ -108,79 +107,225 @@ export default function Home() {
         )}
       </header>
 
-      <main className="mx-auto max-w-2xl px-6 pb-12">
-        {!loggedIn && (
-          <div className="mb-6 rounded-2xl bg-gradient-to-r from-amber-100 to-orange-100 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-amber-800">用3分钟，看见孩子的学习状态</h3>
-                <p className="text-sm text-amber-700 mt-1">
-                  不看分数，看本质——基于内在结构养育理论
-                </p>
+      <main>
+        {/* Hero Section */}
+        <section className="px-6 py-12 text-center">
+          <h2 className="text-2xl font-bold text-stone-800 leading-relaxed">
+            孩子取得好成绩的关键究竟是什么？
+          </h2>
+          <p className="mt-4 text-lg text-stone-600">
+            一对陪伴孩子裸分考上清华的家长告诉你：
+          </p>
+          <p className="mt-2 text-xl text-amber-700 font-medium">
+            一个内在结构稳定有活力的孩子，<br />更容易取得成绩上的好表现。
+          </p>
+          <p className="mt-6 text-stone-600">
+            荔学卷帮你看见——你的孩子内在结构是什么样的。
+          </p>
+          <div className="mt-8">
+            <Link
+              href={loggedIn ? '/select-child/primary-low' : '/register'}
+              className="inline-block rounded-full bg-amber-500 px-8 py-3 text-lg font-medium text-white shadow-lg hover:bg-amber-600 transition-colors"
+            >
+              3分钟，看见真实的孩子
+            </Link>
+          </div>
+        </section>
+
+        {/* What is Inner Structure Section */}
+        <section className="px-6 py-12 bg-white">
+          <div className="max-w-2xl mx-auto">
+            <h3 className="text-xl font-semibold text-stone-800 text-center">
+              什么是内在结构？
+            </h3>
+            <p className="mt-4 text-stone-600">
+              孩子从小学到高三的12年，不是在"学知识"，而是在完成六个内在结构的建设。
+            </p>
+            <div className="mt-6 space-y-4">
+              <div className="flex items-start gap-4">
+                <span className="text-2xl">🌱</span>
+                <div>
+                  <p className="font-medium text-stone-800">小学低年级 — 勤勉感</p>
+                  <p className="text-sm text-stone-600">相信"我能通过努力把一件事做好"</p>
+                </div>
               </div>
-              <Link
-                href="https://nzyy.cc"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-600 transition-colors"
-              >
-                了解更多
-              </Link>
+              <div className="flex items-start gap-4">
+                <span className="text-2xl">🌿</span>
+                <div>
+                  <p className="font-medium text-stone-800">小学高年级 — 胜任感</p>
+                  <p className="text-sm text-stone-600">相信"方法能让事情变容易"</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <span className="text-2xl">🌳</span>
+                <div>
+                  <p className="font-medium text-stone-800">初中 — 自我管理结构</p>
+                  <p className="text-sm text-stone-600">能统筹多门功课，有自己的目标和规划</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <span className="text-2xl">🔥</span>
+                <div>
+                  <p className="font-medium text-stone-800">初三 — 压力整合结构</p>
+                  <p className="text-sm text-stone-600">在压力下，把已有能力转化为实战表现</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <span className="text-2xl">✨</span>
+                <div>
+                  <p className="font-medium text-stone-800">高一高二 — 意义结构</p>
+                  <p className="text-sm text-stone-600">了解自己，学习的动力转向"为自己而学"</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <span className="text-2xl">🦅</span>
+                <div>
+                  <p className="font-medium text-stone-800">高三 — 选择与承担结构</p>
+                  <p className="text-sm text-stone-600">能做出自己的选择，并为之负责</p>
+                </div>
+              </div>
             </div>
           </div>
-        )}
+        </section>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {stages.map((stage) => (
-            <Link
-              key={stage.id}
-              href={loggedIn ? `/select-child/${stage.id}` : `/login`}
-              className="group block rounded-2xl bg-white p-6 shadow-sm transition-all hover:shadow-md hover:scale-[1.02]"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="font-semibold text-stone-800 group-hover:text-amber-600">
-                    {stage.name}
-                  </h2>
-                  <p className="mt-1 text-sm text-stone-500">{stage.gradeRange}</p>
-                </div>
-                <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">
-                  {stage.dimensionCount}维度
-                </span>
+        {/* What is Inner Structure Nurturing Section */}
+        <section className="px-6 py-12 bg-amber-50">
+          <div className="max-w-2xl mx-auto text-center">
+            <h3 className="text-xl font-semibold text-stone-800">
+              什么是内在结构养育？
+            </h3>
+            <p className="mt-4 text-stone-600">
+              面对孩子的任何表现，先问：这对他正在建立的内在结构，是加固还是削弱？
+            </p>
+            <p className="mt-4 text-stone-600">
+              养育的目标不是塑造孩子的外在表现，而是帮助孩子建立起支撑一生的内在心理结构。
+            </p>
+            <p className="mt-4 text-stone-600">
+              在合适的时机，给合适的支持。
+            </p>
+          </div>
+        </section>
+
+        {/* Three Perspectives Section */}
+        <section className="px-6 py-12 bg-amber-50">
+          <div className="max-w-3xl mx-auto">
+            <h3 className="text-center text-lg font-semibold text-stone-800 mb-8">
+              三双眼睛，看见完整的孩子
+            </h3>
+            <div className="grid gap-6 sm:grid-cols-3">
+              <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
+                <div className="text-4xl mb-4">👦</div>
+                <h4 className="font-medium text-stone-800">孩子</h4>
+                <p className="mt-2 text-sm text-stone-600">
+                  他内心的感受<br />他的信念和想法
+                </p>
               </div>
-              <p className="mt-3 text-sm text-stone-600">{stage.description}</p>
-              <p className="mt-3 text-xs text-amber-600">
-                核心能力：{stage.coreAbility}
-              </p>
-            </Link>
-          ))}
-        </div>
+              <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
+                <div className="text-4xl mb-4">👨‍👩‍👧</div>
+                <h4 className="font-medium text-stone-800">家长</h4>
+                <p className="mt-2 text-sm text-stone-600">
+                  家庭场景中<br />能观察到的行为
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
+                <div className="text-4xl mb-4">👩‍🏫</div>
+                <h4 className="font-medium text-stone-800">老师</h4>
+                <p className="mt-2 text-sm text-stone-600">
+                  课堂和校园中<br />能观察到的表现
+                </p>
+              </div>
+            </div>
+            <p className="mt-8 text-center text-stone-600">
+              三方视角拼在一起，才是孩子完整的样子。
+            </p>
+          </div>
+        </section>
 
-        <div className="mt-8 flex gap-4">
-          {loggedIn ? (
-            <Link
-              href="/history"
-              className="flex-1 rounded-xl border border-stone-300 bg-white py-4 text-center font-medium text-stone-600 transition-colors hover:bg-stone-50"
-            >
-              📋 查看历史记录
-            </Link>
-          ) : (
-            <Link
-              href="/login"
-              className="flex-1 rounded-xl border border-stone-300 bg-white py-4 text-center font-medium text-stone-600 transition-colors hover:bg-stone-50"
-            >
-              📋 登录查看历史
-            </Link>
-          )}
-        </div>
+        {/* Core Value Section */}
+        <section className="px-6 py-12 bg-white">
+          <div className="max-w-2xl mx-auto text-center">
+            <h3 className="text-xl font-semibold text-stone-800">
+              看见真实的孩子，看见真实状态
+            </h3>
+            <p className="mt-4 text-stone-600">
+              成绩是属于孩子的。家长能做的，是支持。
+              <br />
+              只有看见了，才懂得如何去支持孩子取得世俗意义上的良好表现。
+            </p>
+          </div>
+        </section>
 
-        <div className="mt-8 rounded-xl bg-stone-100 p-4">
-          <h3 className="font-medium text-stone-700">关于测评</h3>
-          <p className="mt-2 text-sm text-stone-600">
-            本测评基于「内在结构养育理论」，从多个维度评估孩子的学习状态。
-            完成测评后，您将获得个性化的分析报告和引导建议。
+        {/* Stage Selection */}
+        <section className="px-6 py-12 bg-stone-100">
+          <div className="max-w-2xl mx-auto">
+            <h3 className="text-center text-lg font-semibold text-stone-800 mb-8">
+              选择孩子的学段，开始测评
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {stages.map((stage) => (
+                <Link
+                  key={stage.id}
+                  href={loggedIn ? `/select-child/${stage.id}` : `/register`}
+                  className="group bg-white rounded-xl p-5 shadow-sm hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-medium text-stone-800 group-hover:text-amber-600">
+                        {stage.name}
+                      </h4>
+                      <p className="text-sm text-stone-500 mt-1">{stage.gradeRange}</p>
+                    </div>
+                    <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">
+                      {stage.dimensionCount}维度
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-stone-600">{stage.description}</p>
+                  <p className="mt-2 text-xs text-amber-600">
+                    核心能力：{stage.coreAbility}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Slogan Section */}
+        <section className="px-6 py-12 text-center">
+          <p className="text-2xl text-stone-700 italic">
+            一骑红尘笑，荔途自扶摇
           </p>
-        </div>
+          <p className="mt-4 text-stone-600">
+            在合适的时机，给合适的支持
+          </p>
+        </section>
+
+        {/* Bottom CTA */}
+        <section className="px-6 py-12 bg-amber-500 text-white text-center">
+          <h3 className="text-xl font-semibold">
+            准备好看见真实的孩子了吗？
+          </h3>
+          <p className="mt-2 text-amber-100">
+            3分钟测评，看见孩子本来的样子
+          </p>
+          <div className="mt-6">
+            <Link
+              href={loggedIn ? '/select-child/primary-low' : '/register'}
+              className="inline-block rounded-full bg-white px-8 py-3 text-amber-700 font-medium hover:bg-amber-50 transition-colors"
+            >
+              开始测评
+            </Link>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="px-6 py-8 text-center text-sm text-stone-500">
+          <p>© 2026 内在结构养育 · 朋大大 & 杨莉老师</p>
+          <p className="mt-2">
+            <Link href="/privacy" className="hover:text-stone-700">隐私政策</Link>
+            <span className="mx-2">·</span>
+            <Link href="/terms" className="hover:text-stone-700">服务条款</Link>
+          </p>
+        </footer>
       </main>
     </div>
   );
