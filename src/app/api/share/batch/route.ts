@@ -16,12 +16,18 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       return apiError('无效的问卷类型', 400);
     }
 
+    // student/teacher 类型必须提供 childId
+    if ((questionnaireType === 'student' || questionnaireType === 'teacher') && !childId) {
+      return apiError('邀请孩子/老师测评时必须提供孩子档案', 400);
+    }
+
     const batch = await createShareBatch(
       context.user.id,
       stageId,
       questionnaireType,
       slotCount || 1,
-      expiresInDays || 2
+      expiresInDays || 2,
+      childId
     );
 
     const slot = batch.slots[0];
@@ -30,8 +36,8 @@ export const POST = withAuth(async (request: NextRequest, context) => {
     if (questionnaireType === 'register') {
       shareUrl = `/register?share=${batch.batch.id}&slot=${slot?.code || ''}`;
     } else {
-      // student or teacher
-      shareUrl = `/assessment/${stageId}/${questionnaireType}?share=${batch.batch.id}&slot=${slot?.code || ''}${childId ? `&childId=${childId}` : ''}`;
+      // student or teacher - slot 已绑定 childId，URL 不再需要传递 childId
+      shareUrl = `/assessment/${stageId}/${questionnaireType}?share=${batch.batch.id}&slot=${slot?.code || ''}`;
     }
 
     return apiSuccess({

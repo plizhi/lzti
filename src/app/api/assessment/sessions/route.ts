@@ -19,11 +19,9 @@ export async function POST(request: NextRequest) {
     const { slotCode, childId, stageId } = body;
 
     // 如果有 slotCode，通过 slot 创建（分享流程）
+    // childId 从 slot 中读取，不再从参数传递（安全加固）
     if (slotCode) {
-      if (!childId) {
-        return apiError('请提供孩子 ID', 400);
-      }
-      const session = await createSessionBySlot(slotCode, childId);
+      const session = await createSessionBySlot(slotCode);
       return apiSuccess(session, 201);
     }
 

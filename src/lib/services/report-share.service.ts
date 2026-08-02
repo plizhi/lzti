@@ -1,22 +1,7 @@
 import { prisma } from '@/lib/db';
 import { ApiError } from '@/lib/api/response';
 import { getQuestionnaire } from '@/data/questionnaires';
-
-// 生成8位字母数字分享码
-async function generateShareCode(): Promise<string> {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-
-  // 确保唯一
-  const existing = await prisma.reportShare.findUnique({ where: { shareCode: code } });
-  if (existing) {
-    return generateShareCode(); // 递归重试
-  }
-  return code;
-}
+import { generateReportShareCode } from './code-generator';
 
 // 创建报告分享
 export async function createReportShare(
@@ -75,7 +60,7 @@ export async function createReportShare(
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
-  const shareCode = await generateShareCode();
+  const shareCode = await generateReportShareCode();
 
   const share = await prisma.reportShare.create({
     data: {

@@ -1,25 +1,10 @@
 import { prisma } from '@/lib/db';
+import { generateBatchCode } from './code-generator';
 
 // 生成6位数字邀请码（确保唯一）
+// @deprecated 请使用 generateBatchCode from code-generator.ts
 export async function generateInviteCode(): Promise<string> {
-  let code: string;
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  do {
-    code = Math.random().toString().slice(2, 8).padStart(6, '0');
-    const exists = await prisma.slot.findUnique({ where: { code } }) ||
-                   await prisma.userInviteCode.findUnique({ where: { code } });
-    if (!exists) {
-      return code;
-    }
-    attempts++;
-  } while (attempts < maxAttempts);
-
-  // 如果重复太多，使用时间戳+随机数
-  const timestamp = Date.now().toString().slice(-4);
-  const random = Math.random().toString().slice(2, 6);
-  return `${timestamp}${random}`.slice(0, 6);
+  return generateBatchCode();
 }
 
 // 验证 Slot 邀请码（兼容旧接口）

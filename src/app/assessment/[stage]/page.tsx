@@ -51,13 +51,11 @@ function AssessmentPageContent() {
   const sessionIdParam = searchParams.get('sessionId');
   const shareId = searchParams.get('share');
   const slotCode = searchParams.get('slot');
-  const childIdFromShare = searchParams.get('childId');
 
   const stage = getStage(stageId);
   const questionnaire = getQuestionnaire(stageId);
 
   const [sessionId, setSessionId] = useState<string | null>(sessionIdParam);
-  const [childId, setChildId] = useState<string | null>(childIdFromShare);
   const [questionnaireType, setQuestionnaireType] = useState<QuestionnaireType>(
     typeParam && ['student', 'parent', 'teacher'].includes(typeParam) ? typeParam : 'parent'
   );
@@ -82,19 +80,13 @@ function AssessmentPageContent() {
     // 如果没有分享链接参数，不自动创建 session
     if (!shareId || !slotCode) return;
 
-    // 如果是分享流程，需要 childId
-    if (!childId) {
-      setInitError('无效的测评链接：缺少孩子信息');
-      return;
-    }
-
     const createSession = async () => {
       setIsInitializing(true);
       try {
         const response = await fetch('/api/assessment/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slotCode, childId }),
+          body: JSON.stringify({ slotCode }),
         });
         const json = await response.json();
 
@@ -112,7 +104,7 @@ function AssessmentPageContent() {
     };
 
     createSession();
-  }, [stage, questionnaire, sessionId, shareId, slotCode, childId, router]);
+  }, [stage, questionnaire, sessionId, shareId, slotCode, router]);
 
   // 加载已保存的进度
   useEffect(() => {

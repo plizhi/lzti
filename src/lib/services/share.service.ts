@@ -2,15 +2,33 @@ import { prisma } from '@/lib/db';
 import { generateInviteCode } from './invitation.service';
 
 // 创建分享批次
+// childId: 对于 student/teacher 类型必须提供，用于绑定 slot
+// 注意：此函数仍被 API 层使用，未来可能合并到 invitation.service.ts
 export async function createShareBatch(
   userId: string,
   stageId: string,
   questionnaireType: 'register' | 'student' | 'teacher',
   slotCount: number = 10,
-  expiresInDays: number = 2
+  expiresInDays: number = 2,
+  childId?: string
 ) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+
+  // student/teacher 类型必须绑定 childId
+  if ((questionnaireType === 'student' || questionnaireType === 'teacher') && !childId) {
+    throw new Error('邀请孩子/老师测评时必须提供 childId');
+  }
+
+  // 验证 childId 属于当前用户
+  if (childId) {
+    const child = await prisma.child.findFirst({
+      where: { id: childId, userId },
+    });
+    if (!child) {
+      throw new Error('孩子档案不存在');
+    }
+  }
 
   // 创建批次
   const batch = await prisma.shareBatch.create({
@@ -32,6 +50,8 @@ export async function createShareBatch(
           type: questionnaireType,
           code,
           expiresAt,
+          // student/teacher 类型时直接绑定 childId，防止 URL 篡改
+          childId: childId || null,
         },
       });
     })

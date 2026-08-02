@@ -5,31 +5,7 @@ import {
   createTrialCoupon,
   type PointBalance,
 } from './point.service';
-
-// 生成8位字母数字分享码
-export async function generateShareCode(): Promise<string> {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 避免易混淆字符
-  let code: string;
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  do {
-    code = '';
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    const exists = await prisma.user.findUnique({ where: { shareCode: code } });
-    if (!exists) {
-      return code;
-    }
-    attempts++;
-  } while (attempts < maxAttempts);
-
-  // 兜底：使用时间戳+随机
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).slice(2, 6);
-  return `${timestamp}${random}`.slice(0, 8).toUpperCase();
-}
+import { generateReferralCode } from './code-generator';
 
 // 获取或创建用户的分享码
 export async function getOrCreateShareCode(userId: string): Promise<string> {
@@ -43,7 +19,7 @@ export async function getOrCreateShareCode(userId: string): Promise<string> {
   }
 
   // 创建新的分享码
-  const shareCode = await generateShareCode();
+  const shareCode = await generateReferralCode();
   await prisma.user.update({
     where: { id: userId },
     data: { shareCode },

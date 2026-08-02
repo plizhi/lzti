@@ -144,10 +144,9 @@ export async function getHistorySessions(userId: string, params?: { childId?: st
 }
 
 // 通过 slot 创建 session（用于分享测评流程）
-export async function createSessionBySlot(
-  slotCode: string,
-  childId: string
-) {
+// @param slotCode - 邀请码
+// 注意：childId 从 slot 读取，不再从 URL 参数传入（安全加固）
+export async function createSessionBySlot(slotCode: string) {
   // 验证 slot
   const slot = await prisma.slot.findUnique({
     where: { code: slotCode },
@@ -170,6 +169,12 @@ export async function createSessionBySlot(
     throw new ApiError('此链接不是测评邀请', 400);
   }
 
+  // 从 slot 读取 childId（创建时已绑定）
+  const childId = slot.childId;
+  if (!childId) {
+    throw new ApiError('邀请码未绑定孩子档案', 400);
+  }
+
   const stageId = slot.batch.stageId;
 
   // 验证孩子存在且属于分享者
@@ -187,7 +192,6 @@ export async function createSessionBySlot(
     data: {
       usedBy: slot.batch.userId,
       usedAt: new Date(),
-      childId,
     },
   });
 
