@@ -109,12 +109,18 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="mt-8 grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
           <Link
             href="/admin/users"
             className="text-center py-4 rounded-xl bg-white shadow-sm font-medium text-stone-600 hover:bg-stone-50"
           >
             用户管理
+          </Link>
+          <Link
+            href="/admin/invitation-codes"
+            className="text-center py-4 rounded-xl bg-white shadow-sm font-medium text-stone-600 hover:bg-stone-50"
+          >
+            邀请码管理
           </Link>
           <Link
             href="/admin/export"
