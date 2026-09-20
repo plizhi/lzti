@@ -18,12 +18,15 @@ export interface MembershipStatus {
   totalAttempts: number;      // 年度总次数（订阅）
   attemptsUsed: number;       // 已使用次数（订阅）
   attemptsRemaining: number;  // 剩余次数（订阅）
+  // nzyy 用户状态
+  isPending: boolean;        // 是否为 pending 用户
+  pendingExpireAt: Date | null; // pending 用户过期时间
 }
 
 // 权益检查结果
 export interface QuotaCheckResult {
   allowed: boolean;
-  reason?: 'ok' | 'no_subscription' | 'no_bonus' | 'quota_exceeded' | 'not_implemented';
+  reason?: 'ok' | 'no_subscription' | 'no_bonus' | 'quota_exceeded' | 'not_implemented' | 'pending';
   remaining?: number;
   message?: string;
 }
@@ -38,13 +41,22 @@ export async function getMembershipStatus(userId: string): Promise<MembershipSta
     }),
     prisma.user.findUnique({
       where: { id: userId },
-      select: { bonusAttempts: true, bonusUsed: true },
+      select: {
+        bonusAttempts: true,
+        bonusUsed: true,
+        nzyyStatus: true,
+        nzyyExpireAt: true,
+      },
     }),
   ]);
 
   const isSubscriptionActive = subscription?.status === 'active' &&
     subscription?.expiresAt &&
     subscription.expiresAt > new Date();
+
+  // pending 用户：nzyyStatus='pending' 且未过期
+  const isPending = user?.nzyyStatus === 'pending' &&
+    (!user?.nzyyExpireAt || user.nzyyExpireAt > new Date());
 
   return {
     hasSubscription: isSubscriptionActive,
@@ -58,6 +70,8 @@ export async function getMembershipStatus(userId: string): Promise<MembershipSta
     attemptsRemaining: isSubscriptionActive
       ? (subscription?.attemptsTotal ?? 0) - (subscription?.attemptsUsed ?? 0)
       : 0,
+    isPending,
+    pendingExpireAt: user?.nzyyExpireAt ?? null,
   };
 }
 
@@ -102,7 +116,17 @@ export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
     };
   }
 
-  // 暂时对所有用户开放（等支付接入后修改此处）
+  // pending 用户：提示激活
+  if (status.isPending) {
+    return {
+      allowed: true,
+      reason: 'pending',
+      remaining: 1,
+      message: '请先激活账户',
+    };
+  }
+
+  // 非 pending 且无订阅/奖励用户：暂时开放（等支付接入后修改此处）
   return {
     allowed: true,
     reason: 'ok',

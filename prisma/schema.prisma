@@ -19,6 +19,11 @@ model User {
   shareBatchId  String?   // 来自哪个分享批次
   children      Child[]
 
+  // nzyy 门户对接
+  nzyyStatus    String?   // pending / active（门户用户绑定状态）
+  nzyySource    String?   // nzyy / organic（来源）
+  nzyyExpireAt  DateTime? // pending 用户过期时间
+
   // 分享相关
   shareCode      String?   @unique  // 用户的唯一分享码
   bonusAttempts  Int      @default(0)  // 通过分享获得的额外测评次数（保留兼容）

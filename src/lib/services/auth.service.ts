@@ -205,6 +205,10 @@ export async function getCurrentUser(userId: string) {
     subscription?.expiresAt &&
     subscription.expiresAt > new Date();
 
+  // pending 用户：nzyyStatus='pending' 且未过期
+  const isPending = user.nzyyStatus === 'pending' &&
+    (!user.nzyyExpireAt || user.nzyyExpireAt > new Date());
+
   return {
     id: user.id,
     phone: user.phone,
@@ -221,5 +225,9 @@ export async function getCurrentUser(userId: string) {
       attemptsTotal: subscription!.attemptsTotal,
       attemptsUsed: subscription!.attemptsUsed,
     } : null,
+    // nzyy 用户状态
+    nzyyStatus: user.nzyyStatus,
+    nzyySource: user.nzyySource,
+    isPending,
   };
 }
