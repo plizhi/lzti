@@ -226,7 +226,28 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 
 ---
 
-## 十二、生产级改进（2026-07-27）
+## 十二、2026-09-11 内容完善
+
+### 已完成
+- [x] 首页 slogan 去重 - 删除重复的 slogan section
+- [x] 服务条款完善 - 补充退款政策、数据保护、账户责任等条款
+- [x] 隐私政策完善 - 补充儿童隐私、用户权利、第三方服务等说明
+- [x] 产品权益定义 - `knowledge/产品权益定义.md` 定义荔心卷/升学指数/trial 券
+
+### 积分体系
+- 积分获取：推荐注册+5积分，推荐测评+3积分
+- 积分兑换：荔心卷(10积分)、升学指数(15积分)
+- 奖励积分：已付费用户每满10实际积分奖励2bonusPoints
+- API：`/api/points/balance`、`/api/points/redeem`、`/api/coupons`
+
+### 待接入（支付相关）
+- [ ] 订阅次数限制（当前暂时全部开放）
+- [ ] 会员专属功能 gating
+- [ ] 支付回调处理（Stripe/Gumroad）
+
+---
+
+## 十三、生产级改进（2026-07-27）
 
 - [x] 错误处理统一 - apiError 规范化，parseJsonBody 辅助函数
 - [x] JWT_SECRET 生产检查 - 生产环境禁止使用默认值
@@ -238,7 +259,7 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 
 ---
 
-## 十三、技术备注
+## 十四、技术备注
 
 - Prisma 7 需要 `prisma.config.ts` 配置文件
 - 数据库连接使用 `@prisma/adapter-pg` + `pg`
@@ -246,13 +267,29 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 - **部署原则**：只操作当前项目进程，不影响其他项目
 - **GitHub 仓库**：https://github.com/plizhi/lzti
 
-### 部署架构（2026-08-01 更新）
+### 部署架构（2026-08-05 更新）
 
 - **进程管理**：systemd（不再使用 PM2）
-- **工作目录**：`/home/pupeng/projects/lzti`
 - **systemd 服务**：`/etc/systemd/system/lzti.service`
 - **服务命令**：`systemctl start/restart/status lzti`
 - **港服代理**：47.243.75.164 → 8.147.63.208:3000
+
+### Worktree 架构
+
+```
+lzti       → /home/pupeng/projects/lzti       → master 分支（生产）
+lzti-dev   → /home/pupeng/projects/lzti-dev   → dev-work 分支（开发）
+```
+
+- **生产目录**：`/home/pupeng/projects/lzti`（master 分支）
+- **开发目录**：`/home/pupeng/projects/lzti-dev`（dev-work 分支）
+- **同步流程**：开发完成 → push dev-work → 生产 pull master
+
+### 开发环境操作原则
+
+**不要在** `/home/pupeng/projects/lzti` **进行开发**，那是生产环境。
+
+开发工作在 `/home/pupeng/projects/lzti-dev` 进行。
 
 ### 部署流程
 
@@ -260,13 +297,61 @@ Next.js 16 + React 19 + Tailwind CSS 4 + TypeScript + Prisma + PostgreSQL
 cd /home/pupeng/projects/lzti
 git pull
 npm run build
-systemctl restart lzti
+pm2 reload lzti
+pm2 save
 ```
+
+### PM2 部署配置
+
+```js
+// ecosystem.config.js
+{
+  name: 'lzti',
+  script: 'node_modules/.bin/next',
+  args: 'start',
+  env: { NODE_ENV: 'production', PORT: 3000 }
+}
+```
+
+### error.tsx 兜底机制
+
+所有环境均已配置 `app/error.tsx`，用于捕获 Server Action 版本不一致导致的"幽灵报错"，自动触发页面刷新确保用户体验。
+
+### 部署一致性（2026-08-19）
+
+四个环境（lzti / lzti-dev / wxcl-v2 / wxcl-v2-dev）均统一使用 `next start` 方式部署，无 standalone 模式，配置完全对齐。
 
 ---
 
-## 十四、操作红线
+## 十五、操作红线
 
 1. **不杀其他项目进程** - 只操作当前 lzti 项目的进程
 2. **不修改其他项目代码** - 严格在 `/home/pupeng/projects/lzti` 下工作
 3. **关注自己代码质量** - 确保改动正确后再提交
+
+---
+
+## 十六、问题排查记录（2026-08-06）
+
+### 问题现象
+生产环境 lzti.nzyy.cc 样式错乱（文字重叠、颜色异常、布局混乱）
+
+### 问题原因
+构建产物中某个 CSS chunk（`00-j_vpvicul0.css`）不存在，但 HTML 仍引用它，导致服务器返回 Internal Server Error，样式部分加载失败。
+
+### 排查过程
+1. 检查 nginx 配置（确认端口和代理配置正确）
+2. 测试静态资源加载（发现部分 CSS 返回 500）
+3. 检查 `.next/static/chunks/` 目录（确认文件缺失）
+4. 检查进程启动时间（Aug 2 启动，已运行 4 天）
+
+### 解决方案
+```bash
+systemctl restart lzti
+```
+重启后 systemd 使用正确的构建配置，HTML 不再引用缺失的 CSS，问题解决。
+
+### 经验教训
+- 重启服务可能自动使用最新的正确构建
+- 如果重启不能解决，需要重新 `npm run build`
+- 不要轻易怀疑代码被修改——可能是构建产物与当前代码不匹配

@@ -321,10 +321,10 @@ model PointTransaction {
   @@index([createdAt])
 }
 
-// 券（荔心卷/升学指数/trial试用）
+// 券（荔心卷LX/升学指数SX/trial试用TR）
 model Coupon {
   id          String   @id @default(cuid())
-  code        String   @unique  // 券码，如 LX-XXXXXXXX、TR-XXXXXXXX
+  code        String   @unique  // 券码，如 LX-XXXXXXXX、SX-XXXXXXXX、TR-XXXXXXXX
   type        String   // lixin | shengxue | trial
   status      String   @default("active") // active | used | expired
   userId      String?  // 拥有者

@@ -17,42 +17,116 @@ interface MembershipStatus {
   attemptsRemaining: number;
 }
 
+interface PointBalance {
+  realPoints: number;
+  bonusPoints: number;
+  bonusPointsUsed: number;
+  totalUsable: number;
+}
+
+interface Coupon {
+  id: string;
+  code: string;
+  type: 'lixin' | 'shengxue' | 'trial';
+  status: string;
+  expiresAt: string;
+}
+
+const couponTypeNames: Record<string, string> = {
+  lixin: '荔心卷',
+  shengxue: '升学指数',
+  trial: '试用券',
+};
+
+const couponTypeCosts: Record<string, number> = {
+  lixin: 10,
+  shengxue: 15,
+};
+
 export default function MembershipPage() {
   const [loading, setLoading] = useState(true);
   const [membership, setMembership] = useState<MembershipStatus | null>(null);
+  const [pointBalance, setPointBalance] = useState<PointBalance | null>(null);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [redeeming, setRedeeming] = useState<string | null>(null);
+  const [redeemError, setRedeemError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchMembershipStatus();
+    fetchAllData();
   }, []);
 
-  const fetchMembershipStatus = async () => {
+  const fetchAllData = async () => {
     try {
-      const response = await fetch('/api/auth/me', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('lzti_token')}`,
-        },
-      });
-      const json = await response.json();
-      if (json.success) {
-        // 用户 API 没有返回完整的 membership 状态
-        // 这里需要调用专门的 membership API 或者在用户信息中包含
-        // 暂时使用默认值
+      const token = localStorage.getItem('lzti_token');
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [membershipRes, pointsRes, couponsRes] = await Promise.all([
+        fetch('/api/auth/me', { headers }),
+        fetch('/api/points/balance', { headers }),
+        fetch('/api/coupons', { headers }),
+      ]);
+
+      const [membershipJson, pointsJson, couponsJson] = await Promise.all([
+        membershipRes.json(),
+        pointsRes.json(),
+        couponsRes.json(),
+      ]);
+
+      if (membershipJson.success) {
         setMembership({
           hasSubscription: false,
           subscriptionStatus: null,
           subscriptionExpiresAt: null,
-          bonusAttempts: json.data.bonusAttempts ?? 0,
-          bonusUsed: json.data.bonusUsed ?? 0,
-          bonusRemaining: (json.data.bonusAttempts ?? 0) - (json.data.bonusUsed ?? 0),
+          bonusAttempts: membershipJson.data.bonusAttempts ?? 0,
+          bonusUsed: membershipJson.data.bonusUsed ?? 0,
+          bonusRemaining: (membershipJson.data.bonusAttempts ?? 0) - (membershipJson.data.bonusUsed ?? 0),
           totalAttempts: 0,
           attemptsUsed: 0,
           attemptsRemaining: 0,
         });
       }
+
+      if (pointsJson.success) {
+        setPointBalance(pointsJson.data);
+      }
+
+      if (couponsJson.success) {
+        setCoupons(couponsJson.data);
+      }
     } catch (err) {
-      console.error('获取会员状态失败:', err);
+      console.error('获取数据失败:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRedeem = async (type: 'lixin' | 'shengxue') => {
+    setRedeeming(type);
+    setRedeemError(null);
+
+    try {
+      const token = localStorage.getItem('lzti_token');
+      const response = await fetch('/api/points/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ type }),
+      });
+
+      const json = await response.json();
+
+      if (json.success) {
+        await fetchAllData();
+        alert(`${couponTypeNames[type]}兑换成功！券码：${json.data.couponCode}`);
+      } else {
+        setRedeemError(json.error || '兑换失败');
+      }
+    } catch (err) {
+      setRedeemError('兑换失败，请稍后重试');
+    } finally {
+      setRedeeming(null);
     }
   };
 
@@ -65,6 +139,19 @@ export default function MembershipPage() {
       day: '2-digit',
     });
   };
+
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const activeCoupons = coupons.filter((c) => c.status === 'active');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-12">
@@ -82,6 +169,123 @@ export default function MembershipPage() {
       </header>
 
       <main className="mx-auto max-w-2xl px-6 py-8 space-y-6">
+        {/* 积分余额卡片 */}
+        <div className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">我的积分</h2>
+            {loading && <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+          </div>
+
+          {pointBalance && (
+            <div className="space-y-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold">{pointBalance.totalUsable}</span>
+                <span className="text-amber-100">可用积分</span>
+              </div>
+
+              <div className="flex gap-4 text-sm text-amber-100">
+                <span>实际积分：{pointBalance.realPoints}</span>
+                {pointBalance.bonusPoints > 0 && (
+                  <span>奖励积分：{pointBalance.bonusPoints}</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 积分兑换 */}
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-stone-800 mb-4">积分兑换</h2>
+
+          {loading ? (
+            <div className="flex justify-center py-4">
+              <div className="animate-spin w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 荔心卷 */}
+              <div className="flex items-center justify-between p-4 bg-amber-50 rounded-xl">
+                <div>
+                  <p className="font-medium text-amber-800">荔心卷</p>
+                  <p className="text-sm text-amber-600">单次完整测评，有效期3个月</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-amber-600">10 积分</p>
+                  <button
+                    onClick={() => handleRedeem('lixin')}
+                    disabled={!pointBalance || pointBalance.totalUsable < 10 || redeeming !== null}
+                    className={`mt-1 px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                      pointBalance && pointBalance.totalUsable >= 10 && !redeeming
+                        ? 'bg-amber-500 text-white hover:bg-amber-600'
+                        : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {redeeming === 'lixin' ? '兑换中...' : '立即兑换'}
+                  </button>
+                </div>
+              </div>
+
+              {/* 升学指数 */}
+              <div className="flex items-center justify-between p-4 bg-orange-50 rounded-xl">
+                <div>
+                  <p className="font-medium text-orange-800">升学指数</p>
+                  <p className="text-sm text-orange-600">含趋势追踪，有效期3个月</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-orange-600">15 积分</p>
+                  <button
+                    onClick={() => handleRedeem('shengxue')}
+                    disabled={!pointBalance || pointBalance.totalUsable < 15 || redeeming !== null}
+                    className={`mt-1 px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                      pointBalance && pointBalance.totalUsable >= 15 && !redeeming
+                        ? 'bg-orange-500 text-white hover:bg-orange-600'
+                        : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {redeeming === 'shengxue' ? '兑换中...' : '立即兑换'}
+                  </button>
+                </div>
+              </div>
+
+              {redeemError && (
+                <p className="text-sm text-red-500">{redeemError}</p>
+              )}
+
+              <p className="text-xs text-stone-400">
+                积分获取：推荐注册+5积分，推荐测评+3积分
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 我的券 */}
+        {activeCoupons.length > 0 && (
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-stone-800 mb-4">我的券</h2>
+            <div className="space-y-3">
+              {activeCoupons.map((coupon) => (
+                <div
+                  key={coupon.id}
+                  className="flex items-center justify-between p-4 bg-stone-50 rounded-xl"
+                >
+                  <div>
+                    <p className="font-medium text-stone-700">
+                      {couponTypeNames[coupon.type]}
+                    </p>
+                    <p className="text-sm text-stone-500">
+                      有效期至 {formatDateTime(coupon.expiresAt)}
+                    </p>
+                    <p className="text-xs text-stone-400 font-mono mt-1">{coupon.code}</p>
+                  </div>
+                  <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                    可使用
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 会员状态卡片 */}
         <div className="rounded-2xl bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-stone-800 mb-4">成长陪伴会员</h2>

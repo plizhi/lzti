@@ -289,16 +289,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Slogan Section */}
-        <section className="px-6 py-12 text-center">
-          <p className="text-2xl text-stone-700 italic">
-            一骑红尘笑，荔途自扶摇
-          </p>
-          <p className="mt-4 text-stone-600">
-            在合适的时机，给合适的支持
-          </p>
-        </section>
-
         {/* Bottom CTA */}
         <section className="px-6 py-12 bg-amber-500 text-white text-center">
           <h3 className="text-xl font-semibold">

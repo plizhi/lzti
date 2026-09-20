@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      {
+        "command": "git pull",
+        "reason": "拉取最新代码"
+      },
+      {
+        "command": "npm run build",
+        "reason": "构建项目"
+      },
+      {
+        "command": "systemctl restart lzti",
+        "reason": "重启 lzti 服务"
+      }
+    ]
+  }
+}
