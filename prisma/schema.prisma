@@ -29,6 +29,10 @@ model User {
   bonusAttempts  Int      @default(0)  // 通过分享获得的额外测评次数（保留兼容）
   bonusUsed      Int      @default(0)  // 已使用的分享奖励次数（保留兼容）
 
+  // 免费体验次数（正式用户1次体验）
+  freeAttempts   Int      @default(1)  // 正式用户免费体验次数
+  freeAttemptsUsed Int    @default(0)  // 已使用的免费体验次数
+
   // 积分体系
   realPoints     Int      @default(0)    // 实际积分
   bonusPoints    Int      @default(0)    // 奖励积分（已付费用户满10奖2）

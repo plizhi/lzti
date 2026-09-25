@@ -317,6 +317,11 @@ export async function submitAttempt(
     if (!quotaCheck.allowed) {
       throw new ApiError(quotaCheck.message || '测评次数已用完', 403);
     }
+    // 预扣减次数，如果失败则阻止提交
+    const quotaUsed = await useQuota(userId);
+    if (!quotaUsed) {
+      throw new ApiError('测评次数扣减失败，请重试', 500);
+    }
   }
 
   const questionnaire = getQuestionnaire(session.stageId);
@@ -410,14 +415,6 @@ export async function submitAttempt(
   // 触发推荐奖励：如果被邀请注册的用户完成了测评，给分享者加奖励
   if (userId) {
     onReferralAssessed(userId).catch(console.error);
-  }
-
-  // 使用测评次数
-  if (userId) {
-    const quotaUsed = await useQuota(userId);
-    if (!quotaUsed) {
-      console.error('Failed to use quota for user:', userId);
-    }
   }
 
   // 创建复测提醒：30天后提醒

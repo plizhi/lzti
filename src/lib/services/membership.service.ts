@@ -15,6 +15,7 @@ export interface MembershipStatus {
   bonusAttempts: number;      // 分享获得的奖励次数
   bonusUsed: number;          // 已使用的奖励次数
   bonusRemaining: number;      // 剩余奖励次数
+  freeRemaining: number;       // 免费体验剩余次数
   totalAttempts: number;      // 年度总次数（订阅）
   attemptsUsed: number;       // 已使用次数（订阅）
   attemptsRemaining: number;  // 剩余次数（订阅）
@@ -44,6 +45,8 @@ export async function getMembershipStatus(userId: string): Promise<MembershipSta
       select: {
         bonusAttempts: true,
         bonusUsed: true,
+        freeAttempts: true,
+        freeAttemptsUsed: true,
         nzyyStatus: true,
         nzyyExpireAt: true,
       },
@@ -65,6 +68,7 @@ export async function getMembershipStatus(userId: string): Promise<MembershipSta
     bonusAttempts: user?.bonusAttempts ?? 0,
     bonusUsed: user?.bonusUsed ?? 0,
     bonusRemaining: (user?.bonusAttempts ?? 0) - (user?.bonusUsed ?? 0),
+    freeRemaining: (user?.freeAttempts ?? 1) - (user?.freeAttemptsUsed ?? 0),
     totalAttempts: subscription?.attemptsTotal ?? 0,
     attemptsUsed: subscription?.attemptsUsed ?? 0,
     attemptsRemaining: isSubscriptionActive
@@ -93,28 +97,11 @@ export async function checkFeature(
  * 规则：
  * 1. 有有效订阅且有剩余次数 -> 可以
  * 2. 有分享奖励次数 -> 可以
- * 3. 免费用户（无订阅无奖励）-> 可以（暂时开放）
+ * 3. 有免费体验次数 -> 可以
+ * 4. pending 用户 -> 拒绝
  */
 export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
   const status = await getMembershipStatus(userId);
-
-  // 有订阅且有剩余次数
-  if (status.hasSubscription && status.attemptsRemaining > 0) {
-    return {
-      allowed: true,
-      reason: 'ok',
-      remaining: status.attemptsRemaining + status.bonusRemaining,
-    };
-  }
-
-  // 有分享奖励次数
-  if (status.bonusRemaining > 0) {
-    return {
-      allowed: true,
-      reason: 'ok',
-      remaining: status.attemptsRemaining + status.bonusRemaining,
-    };
-  }
 
   // pending 用户：提示激活
   if (status.isPending) {
@@ -126,18 +113,48 @@ export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
     };
   }
 
-  // 正式用户（无订阅无奖励）：限制1次体验
+  // 计算所有可用次数
+  const totalRemaining = status.attemptsRemaining + status.bonusRemaining + status.freeRemaining;
+
+  // 有订阅且有剩余次数
+  if (status.hasSubscription && status.attemptsRemaining > 0) {
+    return {
+      allowed: true,
+      reason: 'ok',
+      remaining: totalRemaining,
+    };
+  }
+
+  // 有分享奖励次数
+  if (status.bonusRemaining > 0) {
+    return {
+      allowed: true,
+      reason: 'ok',
+      remaining: totalRemaining,
+    };
+  }
+
+  // 有免费体验次数
+  if (status.freeRemaining > 0) {
+    return {
+      allowed: true,
+      reason: 'ok',
+      remaining: totalRemaining,
+    };
+  }
+
+  // 无可用次数
   return {
-    allowed: true,
-    reason: 'ok',
-    remaining: 1,
-    message: '免费体验次数已用完，请购买会员解锁更多',
+    allowed: false,
+    reason: 'quota_exceeded',
+    remaining: 0,
+    message: '测评次数已用完，请购买会员解锁更多',
   };
 }
 
 /**
  * 使用一次测评次数
- * 优先使用订阅次数，再使用分享奖励次数
+ * 优先使用订阅次数，再使用分享奖励次数，最后使用免费体验次数
  * 使用事务保证原子性，避免并发超发
  * 返回是否成功
  */
@@ -175,14 +192,22 @@ export async function useQuota(userId: string): Promise<boolean> {
         return { success: true, source: 'bonus' };
       }
 
+      // 最后使用免费体验次数
+      if (user && user.freeAttemptsUsed < user.freeAttempts) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { freeAttemptsUsed: { increment: 1 } },
+        });
+        return { success: true, source: 'free' };
+      }
+
       return { success: false, source: null };
     });
 
     return result.success;
   } catch (error) {
     console.error('useQuota error:', error);
-    // 暂时对所有用户开放
-    return true;
+    return false;
   }
 }
 
@@ -191,7 +216,7 @@ export async function useQuota(userId: string): Promise<boolean> {
  */
 export async function getRemainingAttempts(userId: string): Promise<number> {
   const status = await getMembershipStatus(userId);
-  return status.attemptsRemaining + status.bonusRemaining;
+  return status.attemptsRemaining + status.bonusRemaining + status.freeRemaining;
 }
 
 /**
