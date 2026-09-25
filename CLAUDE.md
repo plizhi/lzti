@@ -313,6 +313,18 @@ pm2 save
 }
 ```
 
+### 部署架构（2026-09-22）
+
+#### 服务端口映射
+
+| 域名 | 端口 | PM2 进程 | 代码分支 |
+|------|------|----------|----------|
+| lzti.nzyy.ltd | 3010 | lzti-dev | dev-work |
+| lzti.nzyy.cc | 3000 | lzti | master |
+| wxcl.nzyy.ltd | 3011 | wxcl-v2-dev | dev-work |
+| wxcl.nzyy.cc | 3008 | wxcl-v2 | master |
+| nzyy.cc | 3009 | nzyy | master |
+
 ### error.tsx 兜底机制
 
 所有环境均已配置 `app/error.tsx`，用于捕获 Server Action 版本不一致导致的"幽灵报错"，自动触发页面刷新确保用户体验。

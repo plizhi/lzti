@@ -6,7 +6,7 @@ import { determineAllQuadrants } from '@/lib/scoring';
 import { getQuestionnaire } from '@/data/questionnaires';
 import { generateSingleReport } from '@/lib/report/generator';
 import { onReferralAssessed } from './referral.service';
-import { useQuota } from './membership.service';
+import { useQuota, checkQuota } from './membership.service';
 import type { Questionnaire, Question, Dimension, ScoringConfig, ScoringAxisConfig } from '@/types/questionnaire';
 import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
@@ -311,6 +311,14 @@ export async function submitAttempt(
     throw new ApiError('该类型测评已提交', 400);
   }
 
+  // 检查配额（仅对已登录用户）
+  if (userId) {
+    const quotaCheck = await checkQuota(userId);
+    if (!quotaCheck.allowed) {
+      throw new ApiError(quotaCheck.message || '测评次数已用完', 403);
+    }
+  }
+
   const questionnaire = getQuestionnaire(session.stageId);
   if (!questionnaire) {
     throw new ApiError('问卷不存在', 404);
@@ -406,7 +414,10 @@ export async function submitAttempt(
 
   // 使用测评次数
   if (userId) {
-    useQuota(userId).catch(console.error);
+    const quotaUsed = await useQuota(userId);
+    if (!quotaUsed) {
+      console.error('Failed to use quota for user:', userId);
+    }
   }
 
   // 创建复测提醒：30天后提醒
