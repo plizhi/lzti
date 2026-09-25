@@ -2,7 +2,6 @@ import { prisma } from '@/lib/db';
 import {
   earnPoints,
   getPointBalance,
-  createTrialCoupon,
   type PointBalance,
 } from './point.service';
 import { generateReferralCode } from './code-generator';
@@ -189,7 +188,7 @@ export async function onReferralAssessed(refereeId: string) {
 /**
  * 被推荐人完成付费订阅时调用：发放订阅奖励
  * - 推荐人已订阅：+1个月订阅期 + 1次测评
- * - 推荐人未订阅：+1次测评机会（15天有效期，TR-券）
+ * - 推荐人未订阅：+1次bonus attempts
  */
 export async function onReferralSubscribed(refereeId: string) {
   // 查找该用户关联的、未发放订阅奖励的 Referral
@@ -239,11 +238,11 @@ export async function onReferralSubscribed(refereeId: string) {
       bonusAttempts: 1,
     };
   } else {
-    // 推荐人未在订阅期内：给15天有效期的trial券
-    const { code, expiresAt } = await createTrialCoupon(
-      referral.referrerId,
-      referral.id
-    );
+    // 推荐人未在订阅期内：给+1次bonus attempts
+    await prisma.user.update({
+      where: { id: referral.referrerId },
+      data: { bonusAttempts: { increment: 1 } },
+    });
 
     // 更新奖励状态
     await prisma.referral.update({
@@ -253,10 +252,9 @@ export async function onReferralSubscribed(refereeId: string) {
 
     return {
       success: true,
-      rewardType: 'trial_voucher',
-      code,
-      expiresAt,
-      description: '有效期15天的一次完整测评（家长+孩子+老师三视角）',
+      rewardType: 'bonus_attempt',
+      bonusAttempts: 1,
+      description: '获得1次测评奖励',
     };
   }
 }

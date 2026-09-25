@@ -119,28 +119,20 @@ export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
   // pending 用户：提示激活
   if (status.isPending) {
     return {
-      allowed: true,
+      allowed: false,
       reason: 'pending',
-      remaining: 1,
+      remaining: 0,
       message: '请先激活账户',
     };
   }
 
-  // 非 pending 且无订阅/奖励用户：暂时开放（等支付接入后修改此处）
+  // 正式用户（无订阅无奖励）：限制1次体验
   return {
     allowed: true,
     reason: 'ok',
-    remaining: 999, // 临时无限次
+    remaining: 1,
+    message: '免费体验次数已用完，请购买会员解锁更多',
   };
-
-  /* 支付接入后的逻辑：
-  return {
-    allowed: false,
-    reason: status.hasSubscription ? 'quota_exceeded' : 'no_subscription',
-    remaining: 0,
-    message: '请先购买会员',
-  };
-  */
 }
 
 /**
