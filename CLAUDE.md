@@ -367,3 +367,37 @@ systemctl restart lzti
 - 重启服务可能自动使用最新的正确构建
 - 如果重启不能解决，需要重新 `npm run build`
 - 不要轻易怀疑代码被修改——可能是构建产物与当前代码不匹配
+
+---
+
+## 十七、部署教训（2026-09-26）
+
+### 问题
+生产注册页没有邀请码输入框，怀疑缓存或代码同步问题
+
+### 真正原因
+部署流程漏了关键步骤：
+1. git merge ✅
+2. prisma generate ❌（漏了）
+3. prisma db push ✅
+4. npm run build ❌（漏了）
+5. pm2 restart ✅
+
+### 后果
+- prisma generate 漏了 → schema 有新字段但 Prisma Client 不知道 → TypeScript 编译失败
+- npm run build 漏了 → 代码合并了但没重新构建 → 旧页面仍生效
+
+### 教训
+**部署必须完整执行每一步，不能跳步：**
+```bash
+git pull
+prisma generate     # 根据 schema 生成类型
+prisma db push     # 同步数据库结构
+npm run build      # 重新构建
+pm2 restart        # 重启服务
+```
+
+**工作要老老实实：**
+- 不确定的要先验证，不能胡猜
+- 缓存、网络、worktree 都是借口，真正原因往往是最简单的错误
+- 每次操作后确认结果，不要"以为够了"
