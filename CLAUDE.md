@@ -293,13 +293,21 @@ lzti-dev   → /home/pupeng/projects/lzti-dev   → dev-work 分支（开发）
 
 ### 部署流程
 
+**开发环境推送代码：**
+```bash
+git push origin dev-work
+```
+
+**生产环境部署（重要：直接在生产目录 pull，不 merge）：**
 ```bash
 cd /home/pupeng/projects/lzti
-git pull
+git pull origin master
+./node_modules/.bin/prisma generate
 npm run build
-pm2 reload lzti
-pm2 save
+pm2 restart lzti
 ```
+
+**禁止在开发 worktree 执行 merge 到 master，再从生产 pull——这是错误流程。**
 
 ### PM2 部署配置
 
