@@ -12,19 +12,27 @@ export interface LoginData {
 
 // 激活 Slot 并创建预账户
 export async function activateSlotAndCreatePendingUser(slotCode: string, childName?: string) {
-  // 验证并激活 Slot
-  const result = await activateSlot(slotCode);
+  // 先查询 Slot 信息（不激活）
+  const { getSlotInfo } = await import('./share.service');
+  const slotInfo = await getSlotInfo(slotCode);
 
-  if (result.error) {
-    throw new ApiError(result.error, 400);
+  if (!slotInfo) {
+    throw new ApiError('邀请码不存在', 400);
   }
 
-  const slot = result.slot!;
-  const batch = result.batch!;
+  if (!slotInfo.isAvailable) {
+    if (slotInfo.expiresAt < new Date()) {
+      throw new ApiError('邀请码已过期', 400);
+    }
+    if (slotInfo.usedBy) {
+      throw new ApiError('邀请码已被使用', 400);
+    }
+  }
+
+  const batch = slotInfo.batch;
 
   // 检查批次是否还有可用名额
-  if (slot.type === 'register' && batch.questionnaireType === 'register') {
-    // 这是注册类型的批次
+  if (slotInfo.type === 'register' && batch.questionnaireType === 'register') {
     // 创建预账户（关联到批次）
     const user = await prisma.user.create({
       data: {
@@ -33,15 +41,24 @@ export async function activateSlotAndCreatePendingUser(slotCode: string, childNa
       },
     });
 
+    // 用 userId 激活 Slot
+    const result = await activateSlot(slotCode, user.id);
+
+    if (result.error) {
+      // 激活失败，删除已创建的用户
+      await prisma.user.delete({ where: { id: user.id } });
+      throw new ApiError(result.error, 400);
+    }
+
     return {
       user,
-      slot,
+      slot: result.slot!,
       batch,
     };
   }
 
   return {
-    slot,
+    slot: slotInfo,
     batch,
   };
 }
