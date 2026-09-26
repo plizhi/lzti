@@ -19,6 +19,7 @@ function RegisterPageContent() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [initError, setInitError] = useState('');
+  const [inputCode, setInputCode] = useState('');
 
   // 在 step 2 时从 localStorage 获取 referralCode
   const [storedRefCode, setStoredRefCode] = useState<string | null>(null);
@@ -105,39 +106,92 @@ function RegisterPageContent() {
     }
   };
 
-  // 直接访问注册页（无邀请码）
+  // 直接访问注册页（无邀请码）- 让用户手动输入邀请码
   if (step === 0) {
+    const handleCodeSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!inputCode.trim()) {
+        setError('请输入邀请码');
+        return;
+      }
+      setLoading(true);
+      setError('');
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slotCode: inputCode.trim() }),
+        });
+        const json = await response.json();
+
+        if (!json.success) {
+          setError(json.error || '邀请码无效');
+          return;
+        }
+
+        setUserId(json.data.userId);
+        setStep(2);
+      } catch (err) {
+        setError('邀请码验证失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex flex-col">
         <header className="px-6 py-8 text-center">
           <h1 className="text-2xl font-bold text-stone-800">注册</h1>
         </header>
         <main className="mx-auto w-full max-w-sm px-6 flex-1 flex flex-col items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 mx-auto bg-amber-100 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
+          <div className="w-full space-y-6">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-stone-800">输入邀请码</h2>
+              <p className="text-stone-500 text-sm mt-2">
+                请输入您收到的邀请码开始注册
+              </p>
             </div>
-            <h2 className="text-xl font-semibold text-stone-800">需要邀请码才能注册</h2>
-            <p className="text-stone-500 text-sm leading-relaxed">
-              我们的测评服务采用邀请制，请联系您的邀请人获取邀请码。
-            </p>
-          </div>
 
-          <div className="mt-8 w-full space-y-3">
-            <a
-              href="mailto:contact@lizhi-eval.com?subject=申请邀请码&body=您好，我想申请试用荔枝测评，请发送邀请码给我。%0A%0A姓名：%0A联系方式："
-              className="block w-full py-3 rounded-xl bg-amber-500 text-white font-medium text-center hover:bg-amber-600 transition"
-            >
-              邮件申请邀请码
-            </a>
-            <Link
-              href="/login"
-              className="block w-full py-3 rounded-xl border border-stone-300 text-stone-700 font-medium text-center hover:bg-stone-50 transition"
-            >
-              已有账号？登录
-            </Link>
+            <form onSubmit={handleCodeSubmit} className="space-y-4">
+              <div>
+                <input
+                  type="text"
+                  value={inputCode}
+                  onChange={(e) => setInputCode(e.target.value)}
+                  placeholder="请输入邀请码"
+                  className="w-full px-4 py-3 rounded-xl border border-stone-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition text-center text-lg tracking-wider font-mono"
+                  autoComplete="off"
+                />
+              </div>
+
+              {error && (
+                <div className="p-3 rounded-xl bg-red-50 text-red-600 text-sm text-center">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 transition disabled:opacity-50"
+              >
+                {loading ? '验证中...' : '下一步'}
+              </button>
+            </form>
+
+            <div className="text-center">
+              <Link
+                href="/login"
+                className="text-amber-600 hover:underline text-sm"
+              >
+                已有账号？立即登录
+              </Link>
+            </div>
           </div>
 
           <Link href="/" className="mt-8 text-stone-500 hover:text-stone-700">
