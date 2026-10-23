@@ -330,7 +330,7 @@ pm2 restart lzti
 | lzti.nzyy.ltd | 3010 | lzti-dev | dev-work |
 | lzti.nzyy.cc | 3000 | lzti | master |
 | wxcl.nzyy.ltd | 3011 | wxcl-v2-dev | dev-work |
-| wxcl.nzyy.cc | 3008 | wxcl-v2 | master |
+| wxcl.nzyy.cc | 3006 | wxcl-v2 | master |
 | nzyy.cc | 3009 | nzyy | master |
 
 ### error.tsx 兜底机制
