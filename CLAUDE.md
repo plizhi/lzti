@@ -313,21 +313,15 @@ pm2 restart lzti
 
 ### PM2 部署配置
 
-`ecosystem.config.js` 一份配置服务生产和开发两个实例，用 `APP_TARGET` 区分：
+本机所有实例的启动配置**统一在 `/home/pupeng/projects/deploy/ecosystem.config.js`**，各项目仓库里不再放 ecosystem 文件。
 
 ```bash
-pm2 start ecosystem.config.js                  # 生产 lzti     :3000 (cluster)
-APP_TARGET=dev pm2 start ecosystem.config.js   # 开发 lzti-dev :3010 (fork)
+cd /home/pupeng/projects/deploy
+pm2 restart lzti          # 重启单个实例（最常用）
+pm2 save                  # 刷新 dump.pm2，重启机器后靠它恢复
 ```
 
-| 目录 | 变量 | 进程名 | 端口 | 模式 |
-|------|------|--------|------|------|
-| /home/pupeng/projects/lzti | 无 | lzti | 3000 | cluster |
-| /home/pupeng/projects/lzti-dev | APP_TARGET=dev | lzti-dev | 3010 | fork |
-
-wxcl-v2 仓库同理（`ecosystem.config.cjs`）：生产 3006、开发 3011。
-
-**每个项目的启动配置归自己的仓库**，不要在 lzti 仓库里定义 wxcl-v2 的进程。
+新增应用或改端口，都改那个目录里的配置，不要在本仓库定义进程。
 
 ### 部署架构（2026-09-22）
 
