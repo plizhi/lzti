@@ -299,7 +299,14 @@ git push origin dev-work
 git push origin dev-work:master   # 开发→远端 master，生产只从远端拉
 ```
 
-**生产环境部署（重要：直接在生产目录 pull，不 merge）：**
+**生产环境部署（推荐用统一部署脚本，一步到位）：**
+```bash
+/home/pupeng/projects/deploy/deploy.sh lzti
+```
+
+脚本按顺序执行：git pull --ff-only → prisma generate → （可选 --db）prisma db push → npm run build → pm2 restart lzti。
+
+手动执行时顺序不可跳（2026-09-26 漏掉 generate 和 build 两步，注册页没有邀请码输入框）：
 ```bash
 cd /home/pupeng/projects/lzti
 git pull origin master
@@ -313,13 +320,18 @@ pm2 restart lzti
 
 ### PM2 部署配置
 
-本机所有实例的启动配置**统一在 `/home/pupeng/projects/deploy/ecosystem.config.js`**，各项目仓库里不再放 ecosystem 文件。
+本机所有实例的启动配置**统一在 `/home/pupeng/projects/deploy/`**，各项目仓库里不再放 ecosystem 文件。
 
 ```bash
 cd /home/pupeng/projects/deploy
 pm2 restart lzti          # 重启单个实例（最常用）
 pm2 save                  # 刷新 dump.pm2，重启机器后靠它恢复
 ```
+
+- `ecosystem.config.js` —— 6 个实例的启动清单
+- `.env` —— 环境变量唯一来源（600 权限，不入库）；`/srv/nzyy-auth-dev/.env.dev` 软链到它
+- `deploy.sh` —— 统一部署脚本
+- `nginx/` —— 本机实际生效的 nginx 配置副本
 
 新增应用或改端口，都改那个目录里的配置，不要在本仓库定义进程。
 
