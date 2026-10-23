@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [dev-work, master]
+  pull_request:
+    branches: [dev-work, master]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      # 必须显式执行：漏这一步会导致 schema 与 Prisma Client 不一致，
+      # TypeScript 编译失败（2026-09-26 生产事故根因）
+      - name: prisma generate
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+      - name: typecheck
+        run: npx tsc --noEmit
+
+      - name: test
+        run: npm run test:run
+
+      - name: build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          JWT_SECRET: ci-dummy-secret-not-for-production
+
+      # 存量 lint 债务尚未清理（no-explicit-any 等），先只作为可见性信号，
+      # 不阻塞流水线；清零后去掉 continue-on-error
+      - name: lint
+        run: npm run lint
+        continue-on-error: true
