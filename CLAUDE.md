@@ -296,6 +296,7 @@ lzti-dev   → /home/pupeng/projects/lzti-dev   → dev-work 分支（开发）
 **开发环境推送代码：**
 ```bash
 git push origin dev-work
+git push origin dev-work:master   # 开发→远端 master，生产只从远端拉
 ```
 
 **生产环境部署（重要：直接在生产目录 pull，不 merge）：**
@@ -308,18 +309,25 @@ pm2 restart lzti
 ```
 
 **禁止在开发 worktree 执行 merge 到 master，再从生产 pull——这是错误流程。**
+**禁止在生产目录提交代码——生产目录只 pull，不产生 commit。**
 
 ### PM2 部署配置
 
-```js
-// ecosystem.config.js
-{
-  name: 'lzti',
-  script: 'node_modules/.bin/next',
-  args: 'start',
-  env: { NODE_ENV: 'production', PORT: 3000 }
-}
+`ecosystem.config.js` 一份配置服务生产和开发两个实例，用 `APP_TARGET` 区分：
+
+```bash
+pm2 start ecosystem.config.js                  # 生产 lzti     :3000 (cluster)
+APP_TARGET=dev pm2 start ecosystem.config.js   # 开发 lzti-dev :3010 (fork)
 ```
+
+| 目录 | 变量 | 进程名 | 端口 | 模式 |
+|------|------|--------|------|------|
+| /home/pupeng/projects/lzti | 无 | lzti | 3000 | cluster |
+| /home/pupeng/projects/lzti-dev | APP_TARGET=dev | lzti-dev | 3010 | fork |
+
+wxcl-v2 仓库同理（`ecosystem.config.cjs`）：生产 3006、开发 3011。
+
+**每个项目的启动配置归自己的仓库**，不要在 lzti 仓库里定义 wxcl-v2 的进程。
 
 ### 部署架构（2026-09-22）
 
