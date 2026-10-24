@@ -6,7 +6,7 @@ import { determineAllQuadrants } from '@/lib/scoring';
 import { getQuestionnaire } from '@/data/questionnaires';
 import { generateSingleReport } from '@/lib/report/generator';
 import { onReferralAssessed } from './referral.service';
-import { useQuota, checkQuota } from './membership.service';
+import { checkQuota, deductQuota } from './membership.service';
 import type { Questionnaire, Question, Dimension, ScoringConfig, ScoringAxisConfig } from '@/types/questionnaire';
 import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
@@ -321,22 +321,20 @@ export async function submitAttempt(
     throw new ApiError('该类型测评已提交', 400);
   }
 
-  // 检查配额（仅对已登录用户）
+  // 配额：先校验，通过后记账。记账推迟到 attempt 真正落库时，
+  // 跟写入放进同一个事务——先扣后写的话，写入途中抛错会白扣一次，
+  // 用户会被永久卡在「次数已用完」。
+  //
   // 配额单位是「一次测评（session）」：家长、孩子、老师三个视角属于同一次测评，
   // 只有该 session 的首个视角扣次数，后续视角不重复扣、不重复校验，
   // 否则第一次视角扣完后，另外两个视角会被「次数已用完」挡住。
-  if (userId) {
-    if (await isFirstAttemptInSession(sessionId)) {
-      const quotaCheck = await checkQuota(userId);
-      if (!quotaCheck.allowed) {
-        throw new ApiError(quotaCheck.message || '测评次数已用完', 403);
-      }
-      // 预扣减次数，如果失败则阻止提交
-      const quotaUsed = await useQuota(userId);
-      if (!quotaUsed) {
-        throw new ApiError('测评次数扣减失败，请重试', 500);
-      }
+  let quotaOwner: string | null = null;
+  if (userId && (await isFirstAttemptInSession(sessionId))) {
+    const quotaCheck = await checkQuota(userId);
+    if (!quotaCheck.allowed) {
+      throw new ApiError(quotaCheck.message || '测评次数已用完', 403);
     }
+    quotaOwner = userId;
   }
 
   const questionnaire = getQuestionnaire(session.stageId);
@@ -363,16 +361,25 @@ export async function submitAttempt(
   const { scores } = calculateAllDimensionScores(scoringConfig, questions, data.answers);
   const quadrants = determineAllQuadrants(scores);
 
-  const attempt = await prisma.sessionAttempt.create({
-    data: {
-      sessionId,
-      childId: session.childId,
-      questionnaireType,
-      stageId: session.stageId,
-      answers: data.answers,
-      scores,
-      quadrants,
-    },
+  // 扣次数与写入测评记录放在同一个事务：要么都成，要么都不成。
+  const attempt = await prisma.$transaction(async (tx) => {
+    if (quotaOwner) {
+      const charged = await deductQuota(tx, quotaOwner);
+      if (!charged) {
+        throw new ApiError('测评次数扣减失败，请重试', 500);
+      }
+    }
+    return tx.sessionAttempt.create({
+      data: {
+        sessionId,
+        childId: session.childId,
+        questionnaireType,
+        stageId: session.stageId,
+        answers: data.answers,
+        scores,
+        quadrants,
+      },
+    });
   });
 
   const attemptId = attempt.id;

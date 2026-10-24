@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 
 // 会员权益类型
 export type MembershipFeature =
@@ -153,62 +154,55 @@ export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
 }
 
 /**
- * 使用一次测评次数
- * 优先使用订阅次数，再使用分享奖励次数，最后使用免费体验次数
- * 使用事务保证原子性，避免并发超发
- * 返回是否成功
+ * 在给定事务里扣减一次测评次数。
+ * 抽出来是为了让调用方能把「扣次数」和「写入测评记录」放进同一个事务：
+ * 记录没写成、次数却已经扣掉的话，用户会被永久卡在「次数已用完」。
+ * 优先使用订阅次数，再使用分享奖励次数，最后使用免费体验次数。
  */
-export async function useQuota(userId: string): Promise<boolean> {
-  try {
-    // 使用事务保证原子性
-    const result = await prisma.$transaction(async (tx) => {
-      // 优先使用订阅次数
-      const subscription = await tx.subscription.findFirst({
-        where: {
-          userId,
-          status: 'active',
-          expiresAt: { gt: new Date() },
-        },
-      });
+export async function deductQuota(
+  tx: Prisma.TransactionClient,
+  userId: string
+): Promise<boolean> {
+  // 优先使用订阅次数
+  const subscription = await tx.subscription.findFirst({
+    where: {
+      userId,
+      status: 'active',
+      expiresAt: { gt: new Date() },
+    },
+  });
 
-      if (subscription && subscription.attemptsUsed < subscription.attemptsTotal) {
-        await tx.subscription.update({
-          where: { id: subscription.id },
-          data: { attemptsUsed: { increment: 1 } },
-        });
-        return { success: true, source: 'subscription' };
-      }
-
-      // 其次使用分享奖励次数
-      const user = await tx.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (user && user.bonusUsed < user.bonusAttempts) {
-        await tx.user.update({
-          where: { id: userId },
-          data: { bonusUsed: { increment: 1 } },
-        });
-        return { success: true, source: 'bonus' };
-      }
-
-      // 最后使用免费体验次数
-      if (user && user.freeAttemptsUsed < user.freeAttempts) {
-        await tx.user.update({
-          where: { id: userId },
-          data: { freeAttemptsUsed: { increment: 1 } },
-        });
-        return { success: true, source: 'free' };
-      }
-
-      return { success: false, source: null };
+  if (subscription && subscription.attemptsUsed < subscription.attemptsTotal) {
+    await tx.subscription.update({
+      where: { id: subscription.id },
+      data: { attemptsUsed: { increment: 1 } },
     });
-
-    return result.success;
-  } catch (error) {
-    console.error('useQuota error:', error);
-    return false;
+    return true;
   }
+
+  // 其次使用分享奖励次数
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (user && user.bonusUsed < user.bonusAttempts) {
+    await tx.user.update({
+      where: { id: userId },
+      data: { bonusUsed: { increment: 1 } },
+    });
+    return true;
+  }
+
+  // 最后使用免费体验次数
+  if (user && user.freeAttemptsUsed < user.freeAttempts) {
+    await tx.user.update({
+      where: { id: userId },
+      data: { freeAttemptsUsed: { increment: 1 } },
+    });
+    return true;
+  }
+
+  return false;
 }
 
 /**
