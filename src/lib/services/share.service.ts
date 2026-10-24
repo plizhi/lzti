@@ -1,6 +1,45 @@
 import { prisma } from '@/lib/db';
 import { generateInviteCode } from './invitation.service';
 
+// 体系账号批次：没有分享人，归属留空。
+// 体系账号（望杏成林等）的用户不是被某个用户分享来的，
+// 但账户起点仍要有一个 slot，转正规则才与普通注册保持一致。
+const SYSTEM_BATCH_USER_ID = 'system';
+const SYSTEM_BATCH_STAGE = 'primary-low';
+
+// 发放一个体系账号 slot（挂在唯一的系统批次下）
+export async function createSystemSlot() {
+  const existing = await prisma.shareBatch.findFirst({
+    where: {
+      userId: SYSTEM_BATCH_USER_ID,
+      stageId: SYSTEM_BATCH_STAGE,
+      questionnaireType: 'register',
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const batch = existing ?? await prisma.shareBatch.create({
+    data: {
+      userId: SYSTEM_BATCH_USER_ID,
+      stageId: SYSTEM_BATCH_STAGE,
+      questionnaireType: 'register',
+      expiresAt: new Date('2099-12-31'),
+    },
+  });
+
+  const code = await generateInviteCode();
+  const slot = await prisma.slot.create({
+    data: {
+      batchId: batch.id,
+      type: 'register',
+      code,
+      expiresAt: new Date('2099-12-31'),
+    },
+  });
+
+  return { batch, slot };
+}
+
 // 创建分享批次
 // childId: 对于 student/teacher 类型必须提供，用于绑定 slot
 // 注意：此函数仍被 API 层使用，未来可能合并到 invitation.service.ts

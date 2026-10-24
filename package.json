@@ -19,6 +19,7 @@
     "@upstash/redis": "^1.38.0",
     "bcrypt": "^6.0.0",
     "dexie": "^4.0.8",
+    "jose": "^6.2.13",
     "jsonwebtoken": "^9.0.3",
     "next": "16.2.6",
     "nodemailer": "^9.0.3",

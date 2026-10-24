@@ -111,6 +111,9 @@ export async function completeRegistration(
       phone: validatedPhone,
       passwordHash,
       status: 'ACTIVE',
+      // 完成注册即不再是 pending。nzyyStatus 此前只被写成 pending、从未转正，
+      // 导致门户绑定来的用户完成注册后仍被判为受限用户、无法测评
+      nzyyStatus: user.nzyyStatus === 'pending' ? 'active' : user.nzyyStatus,
     },
   });
 

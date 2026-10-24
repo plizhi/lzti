@@ -12,6 +12,16 @@ import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
 
 /**
+ * 本次提交是否为该 session 的首个视角。
+ * 配额单位是一次测评（session）：家长、孩子、老师三个视角属于同一次测评，
+ * 只有首个视角扣次数，其余视角不重复扣、不重复校验。
+ */
+export async function isFirstAttemptInSession(sessionId: string): Promise<boolean> {
+  const count = await prisma.sessionAttempt.count({ where: { sessionId } });
+  return count === 0;
+}
+
+/**
  * 创建复测提醒
  * 在测评完成后调用，创建30天后的提醒记录
  */
@@ -312,15 +322,20 @@ export async function submitAttempt(
   }
 
   // 检查配额（仅对已登录用户）
+  // 配额单位是「一次测评（session）」：家长、孩子、老师三个视角属于同一次测评，
+  // 只有该 session 的首个视角扣次数，后续视角不重复扣、不重复校验，
+  // 否则第一次视角扣完后，另外两个视角会被「次数已用完」挡住。
   if (userId) {
-    const quotaCheck = await checkQuota(userId);
-    if (!quotaCheck.allowed) {
-      throw new ApiError(quotaCheck.message || '测评次数已用完', 403);
-    }
-    // 预扣减次数，如果失败则阻止提交
-    const quotaUsed = await useQuota(userId);
-    if (!quotaUsed) {
-      throw new ApiError('测评次数扣减失败，请重试', 500);
+    if (await isFirstAttemptInSession(sessionId)) {
+      const quotaCheck = await checkQuota(userId);
+      if (!quotaCheck.allowed) {
+        throw new ApiError(quotaCheck.message || '测评次数已用完', 403);
+      }
+      // 预扣减次数，如果失败则阻止提交
+      const quotaUsed = await useQuota(userId);
+      if (!quotaUsed) {
+        throw new ApiError('测评次数扣减失败，请重试', 500);
+      }
     }
   }
 

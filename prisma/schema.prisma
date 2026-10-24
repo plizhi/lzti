@@ -24,6 +24,9 @@ model User {
   nzyySource    String?   // nzyy / organic（来源）
   nzyyExpireAt  DateTime? // pending 用户过期时间
 
+  // 体系账号（跨应用打通）：auth-dev 的主体 ID，跨应用唯一
+  portalUserId  String?   @unique
+
   // 分享相关
   shareCode      String?   @unique  // 用户的唯一分享码
   bonusAttempts  Int      @default(0)  // 通过分享获得的额外测评次数（保留兼容）
