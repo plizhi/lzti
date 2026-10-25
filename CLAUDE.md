@@ -419,6 +419,27 @@ npm run build      # 重新构建
 pm2 restart        # 重启服务
 ```
 
+### 例外：prisma db push 遇到「加唯一约束」会卡住（2026-10-25）
+
+Prisma 把「加唯一约束」判为**可能丢数据**，普通 `prisma db push` 直接报错退出——
+`deploy.sh` 的第 4 步一停，**后面的 build 和 restart 都不会执行**，命令看似跑完、
+生产其实既没建约束也没更新代码。
+
+```bash
+# 先看会执行什么（只读）
+npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
+
+# 确认相关表没有重复行之后，二选一：
+# A. 精确 SQL（推荐，无删除语义）
+psql -c 'CREATE UNIQUE INDEX "..." ON ...;'
+# B. 显式授权
+npx prisma db push --accept-data-loss
+```
+
+`deploy.sh` 现在有 **`--db-force`** 开关做 B（自带变更预览），
+但 A 仍然更安全：加约束这类增量操作没有删除语义，
+而 `SessionAttempt` 是测评历史记录，删了不可恢复，**且本机零备份**（备份 cron 2026-10-25 才补上）。
+
 **工作要老老实实：**
 - 不确定的要先验证，不能胡猜
 - 缓存、网络、worktree 都是借口，真正原因往往是最简单的错误
