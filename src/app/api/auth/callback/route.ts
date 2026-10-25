@@ -8,7 +8,7 @@ import {
   fetchUserInfo,
   bindOrCreateUser,
   verifyPortalToken,
-  REDIRECT_URI,
+  getSsoConfig,
 } from '@/lib/auth-portal';
 
 // GET /api/auth/callback
@@ -21,6 +21,11 @@ export async function GET(request: NextRequest) {
   const state = url.searchParams.get('state');
 
   const cookieState = request.cookies.get('oauth_state')?.value;
+
+  const config = getSsoConfig();
+  if (!config) {
+    return NextResponse.json({ success: false, error: 'SSO 未配置' }, { status: 500 });
+  }
 
   if (!code || !state || state !== cookieState) {
     return NextResponse.json({ success: false, error: 'invalid oauth state' }, { status: 400 });
@@ -57,7 +62,7 @@ export async function GET(request: NextRequest) {
     // 两个页面共用同一份一次性凭证，所以必须在这里二选一分流，
     // 否则后到的页面拿不到已被消费掉的凭证。
     const response = NextResponse.redirect(
-      new URL(needsSetup ? '/sso/setup' : '/sso/complete', REDIRECT_URI)
+      new URL(needsSetup ? '/sso/setup' : '/sso/complete', config.redirectUri)
     );
 
     response.cookies.set('lzti_sso_token', localToken, {

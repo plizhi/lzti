@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
-import { AUTH_BASE, CLIENT_ID, REDIRECT_URI } from '@/lib/auth-portal';
+import { getSsoConfig } from '@/lib/auth-portal';
 
 export const runtime = 'nodejs';
 
 // GET /api/auth/portal/start
 // 发起体系账号 SSO：生成 state 存 cookie，跳到认证服务授权页
 export async function GET(req: NextRequest) {
-  if (!AUTH_BASE || !REDIRECT_URI) {
+  const config = getSsoConfig();
+  if (!config) {
     return NextResponse.json(
-      { success: false, error: 'SSO 未配置（AUTH_BASE_URL / LZTI_REDIRECT_URI）' },
+      { success: false, error: 'SSO 未配置（AUTH_BASE_URL / CLIENT_ID / CLIENT_LZTI_SECRET / LZTI_REDIRECT_URI / JWT_ISSUER）' },
       { status: 500 }
     );
   }
 
   const state = randomBytes(16).toString('hex');
-  const authorizeUrl = new URL(`${AUTH_BASE}/oauth/authorize`);
-  authorizeUrl.searchParams.set('client_id', CLIENT_ID);
-  authorizeUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+  const authorizeUrl = new URL(`${config.authBase}/oauth/authorize`);
+  authorizeUrl.searchParams.set('client_id', config.clientId);
+  authorizeUrl.searchParams.set('redirect_uri', config.redirectUri);
   authorizeUrl.searchParams.set('state', state);
 
   const res = NextResponse.redirect(authorizeUrl.toString());

@@ -4,12 +4,51 @@ import { ApiError } from '@/lib/api/response';
 import { createSystemSlot } from '@/lib/services/share.service';
 
 const AUTH_BASE     = process.env.AUTH_BASE_URL;
-const CLIENT_ID     = process.env.CLIENT_ID! || 'lzti-dev';
-const CLIENT_SECRET = process.env.CLIENT_LZTI_SECRET!;
-const REDIRECT_URI  = process.env.LZTI_REDIRECT_URI!;
-const JWT_ISSUER    = process.env.JWT_ISSUER!;
+const CLIENT_ID     = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_LZTI_SECRET;
+const REDIRECT_URI  = process.env.LZTI_REDIRECT_URI;
+const JWT_ISSUER    = process.env.JWT_ISSUER;
 
 export { AUTH_BASE, CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, JWT_ISSUER };
+
+export interface SsoConfig {
+  authBase: string;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  jwtIssuer: string;
+}
+
+// SSO 未开通的环境（生产）整个应用要照常可用，
+// 所以这里不做模块加载即崩，只在真正调用 SSO 时才校验配置。
+// 也不能给 CLIENT_ID 兜一个默认值：兜出来的 client_id 不是认证服务认的那个，
+// 报错会晚到换 token 那一步，排查成本高得多。
+export function getSsoConfig(): SsoConfig | null {
+  if (!AUTH_BASE || !CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI || !JWT_ISSUER) {
+    return null;
+  }
+  return {
+    authBase: AUTH_BASE,
+    clientId: CLIENT_ID,
+    clientSecret: CLIENT_SECRET,
+    redirectUri: REDIRECT_URI,
+    jwtIssuer: JWT_ISSUER,
+  };
+}
+
+function requireSsoConfig(): SsoConfig {
+  const missing = [
+    !AUTH_BASE && 'AUTH_BASE_URL',
+    !CLIENT_ID && 'CLIENT_ID',
+    !CLIENT_SECRET && 'CLIENT_LZTI_SECRET',
+    !REDIRECT_URI && 'LZTI_REDIRECT_URI',
+    !JWT_ISSUER && 'JWT_ISSUER',
+  ].filter(Boolean);
+  if (missing.length > 0) {
+    throw new Error(`SSO 未配置：缺少 ${missing.join(', ')}`);
+  }
+  return getSsoConfig()!;
+}
 
 // 惰性创建：模块加载时若 AUTH_BASE_URL 缺失就 new URL 会直接抛错，
 // 导致任何 import 本模块的地方（测试、CI）都崩
@@ -47,9 +86,10 @@ export function normalizePhone(phone: string | null | undefined): string | null 
 // audience 必须锁定本 client：认证服务对所有 client 用同一个 issuer，
 // 不校验 audience 的话，别的应用（望杏成林）的 token 也能在这里通过验签。
 export async function verifyPortalToken(accessToken: string): Promise<PortalPayload> {
+  const config = requireSsoConfig();
   const { payload } = await jwtVerify(accessToken, getJwks(), {
-    issuer: JWT_ISSUER,
-    audience: CLIENT_ID,
+    issuer: config.jwtIssuer,
+    audience: config.clientId,
   });
   return payload as PortalPayload;
 }
@@ -60,15 +100,16 @@ export async function exchangeCode(code: string): Promise<{
   refresh_token: string;
   expires_in: number;
 }> {
-  const res = await fetch(`${requireAuthBase()}/oauth/token`, {
+  const config = requireSsoConfig();
+  const res = await fetch(`${config.authBase}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type:    'authorization_code',
       code,
-      client_id:     CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      redirect_uri:  REDIRECT_URI,
+      client_id:     config.clientId,
+      client_secret: config.clientSecret,
+      redirect_uri:  config.redirectUri,
     }),
   });
   if (!res.ok) throw new Error(`token exchange failed: ${res.status}`);

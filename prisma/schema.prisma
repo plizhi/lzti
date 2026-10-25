@@ -141,6 +141,8 @@ model SessionAttempt {
 
   @@index([sessionId])
   @@index([childId])
+  // 同一 session 的同一视角只能提交一次：并发提交由唯一约束兜底
+  @@unique([sessionId, questionnaireType])
 }
 
 // 测评报告

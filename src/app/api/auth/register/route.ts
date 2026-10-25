@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { activateSlotAndCreatePendingUser, completeRegistration } from '@/lib/services/auth.service';
 import { checkRateLimit, addRateLimitHeaders, rateLimits } from '@/lib/api/handler';
 import { ApiError, parseJsonBody } from '@/lib/api/response';
+import { issueRegistrationTicket, verifyRegistrationTicket } from '@/lib/auth';
 
 const doRateLimit = checkRateLimit(rateLimits.sensitive);
 
@@ -11,7 +12,7 @@ interface SlotBody {
 }
 
 interface RegisterBody {
-  userId?: string;
+  registrationTicket?: string;
   phone?: string;
   password?: string;
   child?: {
@@ -52,7 +53,10 @@ export async function PUT(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       data: {
-        userId: result.user?.id,
+        // 注册票据：userId 只从这里面解，前端不参与决定要注册哪个账户
+        registrationTicket: result.user
+          ? issueRegistrationTicket(result.user.id, { source: 'slot' })
+          : undefined,
         hasAccount: !!result.user,
         slot: {
           code: result.slot.code,
@@ -90,9 +94,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await parseJsonBody<RegisterBody>(request);
-    const { userId, phone, password, child, referralCode } = body;
+    const { registrationTicket, phone, password, child, referralCode } = body;
 
-    if (!userId || !phone || !password) {
+    if (!registrationTicket || !password) {
       const response = NextResponse.json(
         { success: false, error: '请填写完整信息' },
         { status: 400 }
@@ -100,7 +104,29 @@ export async function POST(request: NextRequest) {
       return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
     }
 
-    const result = await completeRegistration(userId, phone, password, child, referralCode);
+    let ticket;
+    try {
+      ticket = verifyRegistrationTicket(registrationTicket);
+    } catch {
+      const response = NextResponse.json(
+        { success: false, error: '注册凭证无效或已过期，请重新开始' },
+        { status: 400 }
+      );
+      return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
+    }
+
+    // SSO 来源：手机号由认证服务验证过，只认票据里的值
+    // 邀请码来源：手机号由用户自己填，仍要校验唯一性
+    const finalPhone = ticket.source === 'sso' ? ticket.phone : phone;
+    if (!finalPhone) {
+      const response = NextResponse.json(
+        { success: false, error: '请填写完整信息' },
+        { status: 400 }
+      );
+      return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);
+    }
+
+    const result = await completeRegistration(ticket.userId, finalPhone, password, child, referralCode);
 
     const response = NextResponse.json({ success: true, data: result });
     return addRateLimitHeaders(response, rateResult.remaining, rateResult.resetAt);

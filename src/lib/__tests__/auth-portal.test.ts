@@ -1,14 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
+// auth-portal 引入了 db 模块，测试不需要真实连接
 vi.mock('@/lib/db', () => ({
-  prisma: {
-    sessionAttempt: { count: vi.fn() },
-  },
+  prisma: {},
 }));
 
 import { normalizePhone } from '@/lib/auth-portal';
-import { isFirstAttemptInSession } from '@/lib/services/assessment.service';
-import { prisma } from '@/lib/db';
 
 describe('normalizePhone', () => {
   it('should strip the +86 country code', () => {
@@ -34,26 +31,3 @@ describe('normalizePhone', () => {
   });
 });
 
-describe('isFirstAttemptInSession', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should be true when the session has no attempt yet', async () => {
-    vi.mocked(prisma.sessionAttempt.count).mockResolvedValue(0);
-    await expect(isFirstAttemptInSession('session-1')).resolves.toBe(true);
-    expect(prisma.sessionAttempt.count).toHaveBeenCalledWith({
-      where: { sessionId: 'session-1' },
-    });
-  });
-
-  it('should be false once another perspective of the session has been submitted', async () => {
-    vi.mocked(prisma.sessionAttempt.count).mockResolvedValue(1);
-    await expect(isFirstAttemptInSession('session-1')).resolves.toBe(false);
-  });
-
-  it('should be false after all three perspectives are submitted', async () => {
-    vi.mocked(prisma.sessionAttempt.count).mockResolvedValue(3);
-    await expect(isFirstAttemptInSession('session-1')).resolves.toBe(false);
-  });
-});

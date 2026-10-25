@@ -12,13 +12,14 @@ import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
 
 /**
- * 本次提交是否为该 session 的首个视角。
- * 配额单位是一次测评（session）：家长、孩子、老师三个视角属于同一次测评，
- * 只有首个视角扣次数，其余视角不重复扣、不重复校验。
+ * Prisma 唯一约束冲突（并发写入同一唯一键）
  */
-export async function isFirstAttemptInSession(sessionId: string): Promise<boolean> {
-  const count = await prisma.sessionAttempt.count({ where: { sessionId } });
-  return count === 0;
+function isUniqueConstraintError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as { code?: string }).code === 'P2002'
+  );
 }
 
 /**
@@ -321,21 +322,12 @@ export async function submitAttempt(
     throw new ApiError('该类型测评已提交', 400);
   }
 
-  // 配额：先校验，通过后记账。记账推迟到 attempt 真正落库时，
-  // 跟写入放进同一个事务——先扣后写的话，写入途中抛错会白扣一次，
-  // 用户会被永久卡在「次数已用完」。
+  // 配额：判定「是否本 session 首个视角」与扣减，都必须在事务里做，
+  // 否则同一 session 的两个视角并发提交时会同时判定为首个 → 扣两次。
   //
   // 配额单位是「一次测评（session）」：家长、孩子、老师三个视角属于同一次测评，
   // 只有该 session 的首个视角扣次数，后续视角不重复扣、不重复校验，
   // 否则第一次视角扣完后，另外两个视角会被「次数已用完」挡住。
-  let quotaOwner: string | null = null;
-  if (userId && (await isFirstAttemptInSession(sessionId))) {
-    const quotaCheck = await checkQuota(userId);
-    if (!quotaCheck.allowed) {
-      throw new ApiError(quotaCheck.message || '测评次数已用完', 403);
-    }
-    quotaOwner = userId;
-  }
 
   const questionnaire = getQuestionnaire(session.stageId);
   if (!questionnaire) {
@@ -363,23 +355,44 @@ export async function submitAttempt(
 
   // 扣次数与写入测评记录放在同一个事务：要么都成，要么都不成。
   const attempt = await prisma.$transaction(async (tx) => {
-    if (quotaOwner) {
-      const charged = await deductQuota(tx, quotaOwner);
+    // 先锁住 session 行：同一 session 的并发提交在这里排队，
+    // 后到的那个事务在拿到锁后能看到前一个已提交的 attempt，
+    // 于是不会把「家长视角」和「孩子视角」都当成首个视角。
+    await tx.$queryRaw`SELECT id FROM "AssessmentSession" WHERE id = ${sessionId} FOR UPDATE`;
+
+    const attemptCount = await tx.sessionAttempt.count({ where: { sessionId } });
+    const isFirstAttempt = attemptCount === 0;
+
+    if (userId && isFirstAttempt) {
+      const quotaCheck = await checkQuota(userId, tx);
+      if (!quotaCheck.allowed) {
+        throw new ApiError(quotaCheck.message || '测评次数已用完', 403);
+      }
+      const charged = await deductQuota(tx, userId);
       if (!charged) {
-        throw new ApiError('测评次数扣减失败，请重试', 500);
+        throw new ApiError('测评次数已用完，请稍后重试', 403);
       }
     }
-    return tx.sessionAttempt.create({
-      data: {
-        sessionId,
-        childId: session.childId,
-        questionnaireType,
-        stageId: session.stageId,
-        answers: data.answers,
-        scores,
-        quadrants,
-      },
-    });
+
+    try {
+      return await tx.sessionAttempt.create({
+        data: {
+          sessionId,
+          childId: session.childId,
+          questionnaireType,
+          stageId: session.stageId,
+          answers: data.answers,
+          scores,
+          quadrants,
+        },
+      });
+    } catch (err) {
+      // 同一 session 同一视角并发提交，唯一约束 (sessionId, questionnaireType) 兜底
+      if (isUniqueConstraintError(err)) {
+        throw new ApiError('该类型测评已提交', 400);
+      }
+      throw err;
+    }
   });
 
   const attemptId = attempt.id;

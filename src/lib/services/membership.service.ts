@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
 
+/** 事务客户端与普通 PrismaClient 的公共子集 */
+export type DbClient = Prisma.TransactionClient;
+
 // 会员权益类型
 export type MembershipFeature =
   | 'trend_comparison'      // 趋势对比
@@ -35,13 +38,17 @@ export interface QuotaCheckResult {
 
 /**
  * 获取用户会员状态
+ * client 可传入事务客户端，让配额校验与扣减落在同一个事务里
  */
-export async function getMembershipStatus(userId: string): Promise<MembershipStatus> {
+export async function getMembershipStatus(
+  userId: string,
+  client: DbClient = prisma
+): Promise<MembershipStatus> {
   const [subscription, user] = await Promise.all([
-    prisma.subscription.findUnique({
+    client.subscription.findUnique({
       where: { userId },
     }),
-    prisma.user.findUnique({
+    client.user.findUnique({
       where: { id: userId },
       select: {
         bonusAttempts: true,
@@ -101,8 +108,11 @@ export async function checkFeature(
  * 3. 有免费体验次数 -> 可以
  * 4. pending 用户 -> 拒绝
  */
-export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
-  const status = await getMembershipStatus(userId);
+export async function checkQuota(
+  userId: string,
+  client: DbClient = prisma
+): Promise<QuotaCheckResult> {
+  const status = await getMembershipStatus(userId, client);
 
   // pending 用户：提示激活
   if (status.isPending) {
@@ -158,6 +168,10 @@ export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
  * 抽出来是为了让调用方能把「扣次数」和「写入测评记录」放进同一个事务：
  * 记录没写成、次数却已经扣掉的话，用户会被永久卡在「次数已用完」。
  * 优先使用订阅次数，再使用分享奖励次数，最后使用免费体验次数。
+ *
+ * 每次扣减都用「条件更新 + 影响行数」完成：判定条件写在 UPDATE 的 WHERE 里，
+ * 由数据库在同一条语句内求值，两个并发事务不会同时通过判定而超扣。
+ * 写成「先读后判再写」的话，并发下两个事务都会读到旧值，超扣一次。
  */
 export async function deductQuota(
   tx: Prisma.TransactionClient,
@@ -172,34 +186,36 @@ export async function deductQuota(
     },
   });
 
-  if (subscription && subscription.attemptsUsed < subscription.attemptsTotal) {
-    await tx.subscription.update({
-      where: { id: subscription.id },
+  if (subscription) {
+    const { count } = await tx.subscription.updateMany({
+      where: { id: subscription.id, attemptsUsed: { lt: subscription.attemptsTotal } },
       data: { attemptsUsed: { increment: 1 } },
     });
-    return true;
+    if (count === 1) return true;
   }
 
   // 其次使用分享奖励次数
   const user = await tx.user.findUnique({
     where: { id: userId },
+    select: {
+      bonusAttempts: true,
+      freeAttempts: true,
+    },
   });
 
-  if (user && user.bonusUsed < user.bonusAttempts) {
-    await tx.user.update({
-      where: { id: userId },
+  if (user) {
+    const { count: bonusCount } = await tx.user.updateMany({
+      where: { id: userId, bonusUsed: { lt: user.bonusAttempts } },
       data: { bonusUsed: { increment: 1 } },
     });
-    return true;
-  }
+    if (bonusCount === 1) return true;
 
-  // 最后使用免费体验次数
-  if (user && user.freeAttemptsUsed < user.freeAttempts) {
-    await tx.user.update({
-      where: { id: userId },
+    // 最后使用免费体验次数
+    const { count: freeCount } = await tx.user.updateMany({
+      where: { id: userId, freeAttemptsUsed: { lt: user.freeAttempts } },
       data: { freeAttemptsUsed: { increment: 1 } },
     });
-    return true;
+    if (freeCount === 1) return true;
   }
 
   return false;

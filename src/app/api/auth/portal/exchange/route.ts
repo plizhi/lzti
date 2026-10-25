@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { issueRegistrationTicket } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -29,7 +30,10 @@ export async function POST(request: NextRequest) {
     data: {
       token,
       needsSetup: !!setup?.userId,
-      userId: setup?.userId,
+      // 补全注册用的票据：userId 与手机号都由服务端决定，前端说了不算
+      registrationTicket: setup?.userId
+        ? issueRegistrationTicket(setup.userId, { phone: setup.phone ?? null, source: 'sso' })
+        : undefined,
       phone: setup?.phone,
     },
   });

@@ -8,7 +8,7 @@ import { setToken } from '@/lib/api/client';
 // 手机号已由体系账号验证过，这里只读展示，不允许修改
 export default function SsoSetupPage() {
   const router = useRouter();
-  const [userId, setUserId] = useState<string | null>(null);
+  const [registrationTicket, setRegistrationTicket] = useState<string | null>(null);
   const [phone, setPhone] = useState<string>('');
   const [childName, setChildName] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +28,7 @@ export default function SsoSetupPage() {
           return;
         }
         setToken(json.data.token);
-        setUserId(json.data.userId || null);
+        setRegistrationTicket(json.data.registrationTicket || null);
         setPhone(json.data.phone || '');
         setReady(true);
       } catch {
@@ -41,7 +41,7 @@ export default function SsoSetupPage() {
     e.preventDefault();
     setError('');
 
-    if (!userId) {
+    if (!registrationTicket) {
       setError('登录信息已失效，请重新登录');
       return;
     }
@@ -64,8 +64,7 @@ export default function SsoSetupPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
-          phone,
+          registrationTicket,
           password,
           child: { name: childName.trim() },
         }),

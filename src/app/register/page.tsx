@@ -13,7 +13,7 @@ function RegisterPageContent() {
   const referralCode = searchParams.get('ref');
 
   const [step, setStep] = useState(1);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [registrationTicket, setRegistrationTicket] = useState<string | null>(null);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -61,7 +61,7 @@ function RegisterPageContent() {
           return;
         }
 
-        setUserId(json.data.userId);
+        setRegistrationTicket(json.data.registrationTicket || null);
         setStep(2);
       } catch (err) {
         setInitError('初始化注册失败');
@@ -85,7 +85,7 @@ function RegisterPageContent() {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, phone, password, referralCode: refCode }),
+        body: JSON.stringify({ registrationTicket, phone, password, referralCode: refCode }),
       });
       const json = await response.json();
 
@@ -129,7 +129,7 @@ function RegisterPageContent() {
           return;
         }
 
-        setUserId(json.data.userId);
+        setRegistrationTicket(json.data.registrationTicket || null);
         setStep(2);
       } catch (err) {
         setError('邀请码验证失败');
