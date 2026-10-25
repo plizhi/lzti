@@ -9,6 +9,9 @@ const CLIENT_SECRET = process.env.CLIENT_LZTI_SECRET;
 const REDIRECT_URI  = process.env.LZTI_REDIRECT_URI;
 const JWT_ISSUER    = process.env.JWT_ISSUER;
 
+// 认证服务不可达时不能把用户请求挂住，否则 auth 抖动 = 注册/登录转圈
+const AUTH_FETCH_TIMEOUT_MS = 10_000;
+
 export { AUTH_BASE, CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, JWT_ISSUER };
 
 export interface SsoConfig {
@@ -111,6 +114,7 @@ export async function exchangeCode(code: string): Promise<{
       client_secret: config.clientSecret,
       redirect_uri:  config.redirectUri,
     }),
+    signal: AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`token exchange failed: ${res.status}`);
   return res.json();
@@ -124,6 +128,7 @@ export async function fetchUserInfo(accessToken: string): Promise<{
 }> {
   const res = await fetch(`${requireAuthBase()}/oauth/userinfo`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`userinfo failed: ${res.status}`);
   return res.json();
