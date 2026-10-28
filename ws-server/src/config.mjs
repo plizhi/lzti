@@ -58,4 +58,14 @@ export const config = {
 
   /** 日志级别：debug | info | warn | error */
   logLevel: str(process.env.LOG_LEVEL, 'info'),
+
+  /**
+   * 应用层保活间隔（毫秒）。
+   *
+   * 虾哥固件在 Protocol::IsTimeout() 里判断「120 秒没收到任何数据就认为通道超时」，
+   * 超时后 IsAudioChannelOpened() 返回 false，设备会断开重连。
+   * WebSocket 层的 ping 不算（固件只在 OnData 里刷新 last_incoming_time_），
+   * 所以这里要定期发一条应用层 JSON 保活。
+   */
+  keepaliveIntervalMs: num(process.env.WS_KEEPALIVE_INTERVAL_MS, 60000),
 };

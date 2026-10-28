@@ -177,29 +177,58 @@ export function buildOggOpus(frames, { sampleRate = 48000, preSkip = 312, serial
   tags.writeUInt32LE(0, 12 + vendor.length); // 用户注释条数
 
   const pages = [];
+
+  // OpusHead 必须单独占据 BOS 页：ffmpeg 的 ogg demuxer 在 OpusHead 与 OpusTags
+  // 同页时会直接报 "Header processing failed"，实测同页布局无法被解码。
   pages.push(buildPage({
     headerType: 0x02, // BOS
     granulePosition: 0,
     serial,
     sequence: 0,
-    packets: [head, tags],
+    packets: [head],
+  }));
+  pages.push(buildPage({
+    headerType: 0x00,
+    granulePosition: 0,
+    serial,
+    sequence: 1,
+    packets: [tags],
   }));
 
-  let sequence = 1;
+  let sequence = 2;
   let samples = 0;
   const samplesPerFrame = 2880; // 60ms @ 48kHz
 
-  frames.forEach((frame, index) => {
-    samples += samplesPerFrame;
-    const isLast = index === frames.length - 1;
+  // 一页最多 255 个 lacing 段，超了就得换页；音频包一般 3 段左右，一页能放几十个。
+  const MAX_SEGMENTS = 255;
+  let pagePackets = [];
+  let pageSegments = 0;
+
+  const flushPage = (isLast) => {
+    if (pagePackets.length === 0) return;
     pages.push(buildPage({
       headerType: isLast ? 0x04 : 0x00, // EOS
       granulePosition: isLast ? Math.max(0, samples - preSkip) : samples,
       serial,
       sequence,
-      packets: [frame],
+      packets: pagePackets,
     }));
     sequence += 1;
+    pagePackets = [];
+    pageSegments = 0;
+  };
+
+  frames.forEach((frame, index) => {
+    const segments = lacingFor(frame.length).length;
+    if (pageSegments + segments > MAX_SEGMENTS) {
+      flushPage(false);
+    }
+    pagePackets.push(frame);
+    pageSegments += segments;
+    samples += samplesPerFrame;
+    if (index === frames.length - 1) {
+      flushPage(true);
+    }
   });
 
   return Buffer.concat(pages);
