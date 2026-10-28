@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server';
 import { withAuth, apiSuccess } from '@/lib/api/handler';
+import { apiError } from '@/lib/api/response';
 import { prisma } from '@/lib/db';
 
 export const GET = withAuth(async (request, context) => {
   if (context.user.role !== 'ADMIN') {
-    return apiSuccess({ error: '需要管理员权限' } as any, 403);
+    return apiError('需要管理员权限', 403);
   }
 
   const { searchParams } = new URL(request.url);
@@ -45,14 +46,14 @@ export const GET = withAuth(async (request, context) => {
 
 export const PATCH = withAuth(async (request: NextRequest, context) => {
   if (context.user.role !== 'ADMIN') {
-    return apiSuccess({ error: '需要管理员权限' } as any, 403);
+    return apiError('需要管理员权限', 403);
   }
 
   const body = await request.json();
   const { id, status, reply } = body;
 
   if (!id) {
-    return apiSuccess({ error: '请提供反馈 ID' }, 400);
+    return apiError('请提供反馈 ID', 400);
   }
 
   const feedback = await prisma.feedback.update({

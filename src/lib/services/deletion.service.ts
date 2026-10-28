@@ -89,11 +89,18 @@ export async function deleteUserCascade(userId: string): Promise<void> {
       // 4. 券的外键是 SET NULL：不删的话会变成无主券，被所有人看见
       await tx.coupon.deleteMany({ where: { userId } });
 
-      // 5. refereeId 没有外键：置空而不是删行，保留推荐人的历史记录
-      await tx.referral.updateMany({
-        where: { refereeId: userId },
-        data: { refereeId: null },
-      });
+      // 5. refereeId 没有外键，必须自己处理。
+      //
+      // 这里必须删行，不能置空：
+      // Referral 里 refereeId=null 的行会被 onReferralRegistered 当成
+      // 「未关联的 referral」捡起来绑到新注册用户身上
+      // （见 referral.service.ts 的 findFirst({shareCode, refereeId: null}））。
+      // 置空等于把一个「已发过奖励」的老记录转手给下一个用同码注册的人，
+      // 新人拿不到本该发的注册积分，老人的奖励记录也被改写。
+      //
+      // 删行的代价是推荐人少一条「我推荐过谁」的记录；
+      // 但被推荐人已经不存在了，这条记录本来就没有意义。
+      await tx.referral.deleteMany({ where: { refereeId: userId } });
 
       // 6. 剩下的由 CASCADE 处理
       await tx.user.delete({ where: { id: userId } });

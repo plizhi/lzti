@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { validateSlotCode } from '@/lib/services/invitation.service';
 import { apiSuccess } from '@/lib/api/handler';
+import { apiError } from '@/lib/api/response';
 
 // 验证邀请码（支持新旧两种格式）
 // 新格式：Slot code
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
     const { code } = body;
 
     if (!code || typeof code !== 'string') {
-      return apiSuccess({ error: '请提供邀请码' }, 400);
+      return apiError('请提供邀请码', 400);
     }
 
     // 先尝试新格式（Slot）
@@ -33,6 +34,6 @@ export async function POST(request: NextRequest) {
     return apiSuccess({ valid: false, error: slotResult.error });
   } catch (error) {
     console.error('Validate invitation code error:', error);
-    return apiSuccess({ error: '验证失败' }, 500);
+    return apiError('验证失败', 500);
   }
 }

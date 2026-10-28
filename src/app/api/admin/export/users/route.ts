@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server';
 import { withAuth, apiSuccess } from '@/lib/api/handler';
+import { apiError } from '@/lib/api/response';
 import { prisma } from '@/lib/db';
 
 export const GET = withAuth(async (request: NextRequest, context) => {
   if (context.user.role !== 'ADMIN') {
-    return apiSuccess({ error: '需要管理员权限' } as any, 403);
+    return apiError('需要管理员权限', 403);
   }
 
   const users = await prisma.user.findMany({

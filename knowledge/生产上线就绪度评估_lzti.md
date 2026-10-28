@@ -9,11 +9,13 @@
 > **修复进度**（2026-10-28 提交 `e3ba1df`）：
 > - ✅ P0-1 券码转让越权 —— 已修 + 16 个用例 + dev 实例 HTTP 实测
 > - ✅ P0-5 删除链断裂 —— 已修 + 真库验证 + HTTP 实测
-> - 连带修掉：`DELETE /api/children/[id]` 带 query string 时取不到 id（Next 16 路由 params）
+> - ✅ P1-0 错误响应契约 —— 已修（14 处 `apiSuccess({error}, 4xx)` → `apiError`）
+> - ✅ 公开分享报告接口一直是坏的 —— 已修（`shareCode` 恒为 `undefined`）
 >
-> **修复过程中新发现**（未修，需单列）：
-> - 🔴 **全项目 14 处 `apiSuccess({ error: ... }, 403)` 返回 `success: true`** —— 前端按 `json.success` 判断，会把「需要管理员权限」当成成功。涉及所有 admin 接口。
-> - 🟡 **券系统是半成品**：`useCoupon` 无任何调用点、`AssessmentSession.couponId` 从未被赋值 → 券只能生成不能使用；`/api/coupons/transfer` 也没有前端调用方。
+> **修复过程中新发现**：
+> - 🔴 **全项目 14 处 `apiSuccess({ error: ... }, 403)` 返回 `success: true`** —— 前端按 `json.success` 判断，会把「需要管理员权限」当成成功。**已修**。
+> - 🔴 **`GET /api/share/report/[shareCode]` 一直是坏的** —— 用 `pathParts.indexOf('report') + 2` 手算下标，但路径里 'report' 出现两次，算出的 `shareCode` 恒为 `undefined`，查库必抛异常。**已修**（改用路由参数）。
+> - 🟡 **券系统是半成品**：`useCoupon` 无任何调用点、`AssessmentSession.couponId` 从未赋值 → 券只能生成不能使用；`/api/coupons/transfer` 也没有前端调用方。
 > - 🟡 限流键可被伪造 `X-Forwarded-For` 绕过（P0-2，仍未修）
 
 ---
@@ -158,7 +160,7 @@
 
 ### P1 —— 上线前应完成
 
-#### P1-0 全项目 14 处错误响应返回 `success: true`（修复 P0 时发现，优先处理）
+#### P1-0 全项目 14 处错误响应返回 `success: true` —— ✅ 已修
 
 - 现象：`apiSuccess({ error: '需要管理员权限' }, 403)` 实际返回 `{ success: true, data: { error: '...' } }`，HTTP 状态是 403 但 **body 里 success 是 true**。
 - 影响：前端全部按 `json.success` 判断，**403 会被当成成功**。例如 `src/app/admin/page.tsx:33`：
@@ -168,8 +170,22 @@
   ```
   结果是管理页面把「需要管理员权限」当成统计数据渲染，**不报错、也不提示权限不足**。涉及所有 admin 接口（feedback / export / stats / users / invitation-codes）。
 - 分布：`grep -rn "apiSuccess({ error" src/` → 14 处。
-- 建议：全部改用 `apiError(message, status)`（`src/lib/api/response.ts` 已有，返回 `{ success: false, error }`）。前端逻辑不用动——它们本来就在 `else` 分支里处理 `json.error`。
-- 注意：改完要确认前端没有依赖 `success: true` 的旧行为（`src/app/admin/export/page.tsx` 与 `invitation-codes/page.tsx` 用的是 `!json.success` 分支，兼容）。
+- **修复**：全部改用 `apiError(message, status)`（`src/lib/api/response.ts` 已有，返回 `{ success: false, error }`）。前端逻辑不用动——它们本来就在 `else` 分支里处理 `json.error`。
+- 验证：`src/lib/__tests__/api-error-contract.test.ts` 3 个用例钉住契约；dev 实例实测 403 现在返回 `{"success":false,"error":"需要管理员权限"}`，正常路径不受影响。
+
+#### P1-0之二 公开分享报告接口一直是坏的 —— ✅ 已修
+
+- 位置：`src/app/api/share/report/[shareCode]/route.ts`
+- 原代码：
+  ```ts
+  const pathParts = url.pathname.split('/');
+  const shareCodeIndex = pathParts.indexOf('report') + 2; // report 后面是 shareCode
+  const shareCode = pathParts[shareCodeIndex];
+  ```
+- 路径是 `/api/share/report/[shareCode]` —— **'report' 出现两次**，`indexOf` 找到的是第一个（`/api/share/report` 那个），`+2` 算出的下标越界 → `shareCode` 恒为 `undefined` → `prisma.reportShare.findUnique({where:{shareCode: undefined}})` 必抛 `PrismaClientValidationError`。
+- 影响：这个**公开**接口从未成功过。页面 `/shared/report/[shareCode]` 是 SSR，服务端直接调 `getSharedReport(params.shareCode)` 所以页面能渲染；但客户端组件 `SharedReportClient.tsx` 的二次拉取一直是失败的。
+- **修复**：改用 Next 路由参数 `params.shareCode`。
+- 验证：实测无效码 → `{"success":false,"error":"分享不存在或已失效"}` 404；有效码 → 返回完整报告 `success: true`。
 
 #### P1-1 可观测性接近于零
 
@@ -285,7 +301,41 @@
 
 ---
 
-## 四、上线准入清单（DoD）
+## 四、修复过程中暴露的「设计边界」与我的自我修正
+
+> 这一节记录的是**改动过程中才发现的**问题，包括**我自己引入的缺陷**。
+> 写在这里是因为：光说「修好了」没有意义，要能看出哪些判断是新的、哪些是原本的。
+
+### 4.1 我自己引入的缺陷（已修正）
+
+**删除用户时把 `Referral.refereeId` 置空 —— 会污染后续注册。**
+
+- 我最初的判断：「置空而非删行，保留推荐人的历史记录」。
+- 实际后果：`referral.service.ts` 的 `onReferralRegistered` 会 `findFirst({ shareCode, refereeId: null })` 捡起「未关联」的 referral 行绑到新注册用户身上。一个带着 `pointsRegistered: true` 的**老记录**被转手给下一个用同码注册的人 → **新人拿不到本该发的 +5 注册积分**，老用户的历史奖励记录也被改写。
+- **怎么发现的**：先写了单测（只断言调了 `updateMany`），但单测证明不了真实后果。改为写真库脚本 `scripts/verify-referral-isolation.ts` 跑真实业务路径，**复现了**。
+- 修正：改为**删行**。代价是推荐人少一条「我推荐过谁」的记录 —— 但被推荐人已不存在，这条记录本来就没意义。
+- 补充事实：`refereeId: null` 的 referral 行在**正常业务里根本不该存在**（`onReferralRegistered` 创建时 `refereeId` 必填），那段 `findFirst` 是防御性死代码。所以删行对正常路径零影响。
+
+**教训**：mock 测试只能证明「我调了这个函数」，证明不了「业务后果对不对」。涉及跨服务的数据生命周期时，必须写**真库脚本跑真实路径**。
+
+### 4.2 原本就存在、我没动的两处（避免制造新风险）
+
+| 处 | 情况 | 为什么不改 |
+|---|---|---|
+| `assessment/sessions/*/route.ts` 等 4 处的 `pathParts.indexOf('sessions') + 1` | 关键词在路径里唯一，**实测取值正确** | 没有实际缺陷就不动。改成 params 虽是「正路」，但每一处改动都是一次回归风险，而此处没有收益 |
+| `apiSuccess({ error })` 改 `apiError` 后前端行为 | 前端 `if (json.success)` / `!json.success` **两种写法都有**，且都在 `else` 分支读 `json.error` | 改完反而更正确，且已逐个路由实测 |
+
+### 4.3 券的设计边界（需要产品决策，不是代码问题）
+
+`/api/coupons/transfer` **前端零调用**，`useCoupon` **全仓无调用点**，`AssessmentSession.couponId` **从未被赋值**，前端**无券码输入框**。
+
+也就是说：**券只能生成、不能使用**，会员页展示的「荔心卷 / 升学指数 / trial 券」对用户是无法兑现的承诺。
+
+我给 transfer 接口加的权限模型（普通用户只能解绑自己的券 / 转给指定用户是管理员权限）**是我根据函数注释「转让券（解除用户绑定）」推断的**，不是文档里写明的规则。**如果产品本意是别的**（比如运营后台要能把券批量派给用户），语义需要重新定义 —— 但**归属校验必须保留**，那是安全底线。
+
+---
+
+## 四之二、上线准入清单（DoD）
 
 - [ ] P0-1 券码转让越权已修 + 有单测（跨用户转让 → 403） —— ✅ **已完成（`e3ba1df`）**
 - [ ] P0-2 限流键改为可信 IP（或接 Redis）；伪造 `X-Forwarded-For` 无法绕过；登录加账户级失败锁定
@@ -294,9 +344,10 @@
 - [ ] P0-5 schema 补 `onDelete: Cascade`；删孩子、删用户（含有测评记录的用户）实测通过；无孤儿数据 —— ✅ **已完成（`e3ba1df`，应用层显式删除；schema 补外键列为 P1-6 遗留）**
 - [ ] P0-6 生产改 `prisma migrate deploy`；上线前 `migrate diff` 出变更面并人工确认；迁移失败即中止
 - [ ] P0-7 备份有异机副本；磁盘降到 <70% 且有 80% 告警
-- [ ] P1-0 14 处 `apiSuccess({error}, 4xx)` 改 `apiError`（否则 403 被当成功）
+- [ ] P1-0 14 处 `apiSuccess({error}, 4xx)` 改 `apiError`（否则 403 被当成功） —— ✅ **已完成**
+- [ ] P1-0之二 公开分享报告接口的 shareCode 取值 —— ✅ **已完成**
 - [ ] P1-1 Sentry DSN 已配；health 真实探库；关键失败路径有告警
-- [ ] P1-2 核心 service 单测补齐（已 74/74；剩 `deductQuota`/`submitAttempt`/`onReferralRegistered`/`useCoupon`/`getSharedReport`）
+- [ ] P1-2 核心 service 单测补齐（已 77/77；剩 `deductQuota`/`submitAttempt`/`onReferralRegistered`/`useCoupon`/`getSharedReport`）
 - [ ] P1-3 积分/推荐奖励改事务 + 条件更新
 - [ ] P1-4 应用侧定时任务上线（清理过期账户/券/批次）
 - [ ] P1-4之二 券的兑换入口做出来（测评选券 + 扣次核销），或下架会员页的券文案

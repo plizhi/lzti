@@ -44,7 +44,10 @@ function makeTx() {
     shareLog: { deleteMany: record('shareLog.deleteMany') },
     feedback: { deleteMany: record('feedback.deleteMany') },
     coupon: { deleteMany: record('coupon.deleteMany') },
-    referral: { updateMany: record('referral.updateMany') },
+    referral: {
+      deleteMany: record('referral.deleteMany'),
+      updateMany: record('referral.updateMany'),
+    },
     user: { delete: record('user.delete') },
   };
 }
@@ -139,13 +142,16 @@ describe('deleteUserCascade 删除顺序', () => {
     expect(couponIdx).toBeLessThan(userIdx);
   });
 
-  it('推荐关系置空而不是删行，保留推荐人历史', async () => {
+  it('推荐关系要删行而不是置空——置空会被下一个用同码注册的人捡走', async () => {
     await deleteUserCascade('user-1');
 
-    expect(tx.referral.updateMany).toHaveBeenCalledWith({
+    // 不能用 updateMany 置空：referral.service 的
+    // findFirst({shareCode, refereeId: null}) 会把置空的行捡起来绑给新用户，
+    // 而那行带着 pointsRegistered=true，新人拿不到本该发的注册积分。
+    expect(tx.referral.deleteMany).toHaveBeenCalledWith({
       where: { refereeId: 'user-1' },
-      data: { refereeId: null },
     });
+    expect(tx.referral.updateMany).not.toHaveBeenCalled();
   });
 
   it('用户不存在时报 404', async () => {
