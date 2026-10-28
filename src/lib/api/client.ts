@@ -256,6 +256,63 @@ export const assessment = {
 };
 
 // Invitation Codes
+// 设备（语音测评硬件）
+export interface DeviceInfo {
+  id: string;
+  name: string;
+  deviceKey: string;
+  status: string;
+  lastSeenAt: string | null;
+  createdAt: string;
+  tokenCount: number;
+}
+
+export const devices = {
+  list: () => request<DeviceInfo[]>('/devices'),
+  createPairingCode: () =>
+    request<{ code: string; expiresAt: string }>('/device/pairing-code', {
+      method: 'POST',
+    }),
+  revoke: (id: string) =>
+    request<{ id: string; status: string }>(`/devices/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// 语音测评（设备驱动：设备念题、孩子说话作答）
+export interface VoiceQuestion {
+  questionId: string;
+  questionText: string;
+  dimensionName: string;
+  questionNumber: number;
+  totalQuestions: number;
+  answeredCount: number;
+  finished: boolean;
+  prompt: string;
+  audioBase64: string | null;
+  scale: { min: number; max: number; minLabel: string; maxLabel: string };
+}
+
+export const voice = {
+  next: (sessionId: string, questionnaireType: string) =>
+    request<VoiceQuestion>('/device/voice/next', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, questionnaireType }),
+    }),
+  answer: (sessionId: string, questionnaireType: string, audioBase64: string) =>
+    request<{
+      recognizedText: string;
+      normalizedValue: number | null;
+      accepted: boolean;
+      retry: boolean;
+      finished: boolean;
+      next: VoiceQuestion;
+    }>('/device/voice/answer', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, questionnaireType, audioBase64 }),
+    }),
+};
+
 export const invitationCodes = {
   validate: (code: string) =>
     request<{

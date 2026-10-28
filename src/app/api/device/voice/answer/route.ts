@@ -44,11 +44,13 @@ const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
  * }
  */
 export const POST = withDeviceAuth(async (request: NextRequest, device) => {
-  // 两种入参形态：
-  // ① multipart/form-data —— 通用，浏览器/模拟器用
+  // 三种入参形态：
+  // ① multipart/form-data —— 通用，Python 模拟器用
   // ② application/octet-stream —— 裸音频字节，固件用（省掉 multipart 封装）
+  // ③ application/json —— { audioBase64, sessionId, questionnaireType }，网页端用
   const contentType = request.headers.get('content-type') || '';
   const isRawAudio = contentType.includes('application/octet-stream');
+  const isJson = contentType.includes('application/json');
 
   let audioBytes: Buffer;
   let filename: string;
@@ -61,12 +63,34 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
     const url = new URL(request.url);
     sessionId = url.searchParams.get('sessionId') || '';
     rawQuestionnaireType = url.searchParams.get('questionnaireType');
+  } else if (isJson) {
+    // 网页端：浏览器录音后转 base64 传上来
+    let body: { audioBase64?: unknown; sessionId?: unknown; questionnaireType?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      throw new ApiError('请求体不是合法 JSON', 400);
+    }
+    if (typeof body.audioBase64 !== 'string' || !body.audioBase64) {
+      throw new ApiError('缺少音频（字段名 audioBase64）', 400);
+    }
+    try {
+      audioBytes = Buffer.from(body.audioBase64, 'base64');
+    } catch {
+      throw new ApiError('音频 base64 解码失败', 400);
+    }
+    filename = 'voice.webm';
+    sessionId = typeof body.sessionId === 'string' ? body.sessionId : '';
+    rawQuestionnaireType = body.questionnaireType;
   } else {
     let form: FormData;
     try {
       form = await request.formData();
     } catch {
-      throw new ApiError('请求必须是 multipart/form-data 或 application/octet-stream', 400);
+      throw new ApiError(
+        '请求必须是 multipart/form-data、application/octet-stream 或 application/json',
+        400
+      );
     }
 
     const audio = form.get('audio');
