@@ -5,6 +5,16 @@
 > 评估口径：从「上线生产」视角，按 **稳定 / 合理 / 安全 / 高效** 四条原则逐条核查
 > 核实方式：读代码 + 实机执行（测试、类型检查、lint、数据库约束实测、pm2/备份/磁盘实况）
 > 原则声明：所有结论均基于实测，不做推断；推断处明确标注「未实测」
+>
+> **修复进度**（2026-10-28 提交 `e3ba1df`）：
+> - ✅ P0-1 券码转让越权 —— 已修 + 16 个用例 + dev 实例 HTTP 实测
+> - ✅ P0-5 删除链断裂 —— 已修 + 真库验证 + HTTP 实测
+> - 连带修掉：`DELETE /api/children/[id]` 带 query string 时取不到 id（Next 16 路由 params）
+>
+> **修复过程中新发现**（未修，需单列）：
+> - 🔴 **全项目 14 处 `apiSuccess({ error: ... }, 403)` 返回 `success: true`** —— 前端按 `json.success` 判断，会把「需要管理员权限」当成成功。涉及所有 admin 接口。
+> - 🟡 **券系统是半成品**：`useCoupon` 无任何调用点、`AssessmentSession.couponId` 从未被赋值 → 券只能生成不能使用；`/api/coupons/transfer` 也没有前端调用方。
+> - 🟡 限流键可被伪造 `X-Forwarded-For` 绕过（P0-2，仍未修）
 
 ---
 
@@ -65,7 +75,7 @@
 
 ### P0 —— 不补就不该上线
 
-#### P0-1 券码转让接口存在确认越权（IDOR）
+#### P0-1 券码转让接口存在确认越权（IDOR） —— ✅ 已修（`e3ba1df`）
 
 - 位置：`src/lib/services/point.service.ts:382` `transferCoupon()`、`src/app/api/coupons/transfer/route.ts`
 - 现状：
@@ -76,7 +86,11 @@
   ```
   路由只做 `requireAuth`，**不校验券的归属**。
 - 影响：任意登录用户只要知道券码，就能把**他人**的券转到**任意 userId**；`newOwnerId` 省略时会把券置为孤儿（`userId=null`）。无归属校验、无限流、无审计。
-- 建议：校验 `coupon.userId === context.user.id`（管理员另放行）；目标用户存在性校验；加限流与审计行；券码本身是凭据，转让应有二次确认与通知。
+- **修复内容**：
+  - 语义重新定死：**普通用户只能解绑自己名下的券**（转成通用券）；**把券指给指定用户是管理员权限**
+  - 补券码存在性 / 已使用 / 已过期校验、目标用户存在性校验
+  - 路由补 `sensitive` 档限流，业务错误返回 4xx 而非一律 500
+- **验证**：`src/lib/__tests__/coupon-transfer.test.ts` 8 个用例；dev 实例 HTTP 实测 6 项——攻击者转走/解绑均 403 且券归属未变；受害者解绑成功；管理员转给指定用户成功；管理员转给不存在的用户报错且不写库；连打 8 次确认限流生效（429）。
 
 #### P0-2 生产限流可被伪造请求头绕过
 
@@ -102,20 +116,31 @@
 - 现状：`Math.random()` 非密码学安全，V8 的 xorshift128+ 状态可由观测输出反推 → **后续生成的码可被预测**。
 - 建议：改用 Node 内置 `crypto.randomInt()`（项目内 `crypto.randomUUID` 已在用）；批次码从 6 位提到 8 位以上；配合 P0-3 的频控。
 
-#### P0-5 删除用户 / 删除孩子档案在有测评记录时必然失败（数据删除权不可兑现）
+#### P0-5 删除用户 / 删除孩子档案在有测评记录时必然失败（数据删除权不可兑现） —— ✅ 已修（`e3ba1df`）
 
-- 位置：`src/app/api/admin/users/route.ts:53` `DELETE`、`src/lib/services/child.service.ts:130` `deleteChild()`
+- 位置：`src/app/api/admin/users/route.ts` `DELETE`、`src/lib/services/child.service.ts` `deleteChild()`
 - 实测证据（`lzti_dev` 库，事务内已回滚）：
   ```
   DELETE FROM "Child" ... → ERROR: violates foreign key constraint "AssessmentSession_childId_fkey"
   DELETE FROM "AssessmentSession" ... → ERROR: violates foreign key constraint "SessionAttempt_sessionId_fkey"
+  DELETE FROM "ShareBatch" (有 slot 时) ... → ERROR: violates foreign key constraint "Slot_batchId_fkey"
   ```
-- 根因：schema 里 `Child.sessions`、`SessionAttempt.session` **都没有 `onDelete: Cascade`**，默认是 Restrict。
+- 根因：schema 里 `Child.sessions`、`SessionAttempt.session`、`Slot.batchId` **都没有 `onDelete: Cascade`**，默认是 Restrict。
   - `deleteChild()` 的注释写着「会级联删除 attempts 和 reports」——**与库不符**，实际会直接报错。
   - `DELETE /api/admin/users` 的事务里 `child.deleteMany` 会因上述 FK 失败 → 整个事务回滚 → **有测评记录的用户根本删不掉**。
+  - `shareBatch.deleteMany` 同理：有 slot 的批次删不掉。
   - 反过来，无测评的用户被删时，`AssessmentSession` / `SessionAttempt` 不在删除清单里 → 留下 `childId` 悬空的孤儿历史数据。
-- 影响：隐私政策里「可要求删除数据」的承诺无法兑现（合规风险）；后台运维删不掉脏数据。
-- 建议：schema 补 `onDelete: Cascade`（`SessionAttempt`、`AttemptReport` 逐级），删除逻辑改为按会话树整体删除并写成事务；`SessionAttempt.childId` 建议补 FK，消除孤儿。
+- **修复方案**：**不动生产 schema**（避开 `prisma db push` 在生产加约束会卡住的老坑），改为新增 `src/lib/services/deletion.service.ts`，在应用层按依赖顺序显式删除：
+  - `deleteChildTree`：`报告 → 尝试 → 会话 → 软引用(分享/提醒) → slot.childId 置空 → 孩子`
+  - `deleteUserCascade`：`孩子树 → slot → 批次 → 无外键的表 → 券 → refereeId 置空 → 用户`
+  - **券必须显式删**：外键是 `SET NULL`，不删会变成「无主券」出现在所有人的券列表里
+  - `refereeId` **置空而非删行**：保留推荐人的历史记录
+  - `Slot.childId` 置空：slot 可能属于别的用户，不能连带删
+- **验证**：
+  - `src/lib/__tests__/deletion.test.ts` 8 个用例（断言的是**删除顺序**，这正是原来坏掉的地方）
+  - 真库验证脚本 `scripts/verify-deletion.ts`：造完整数据树 → 删孩子 → 删用户 → 全部清零
+  - dev 实例 HTTP 实测：带测评记录的孩子可删（child/attempt/report 全清零）；有 slot 的用户可删（7 张表全清零）
+- 遗留（未做，属 P1-6 范畴）：`SessionAttempt.childId` **没有外键**，仍是无约束的软引用。建议后续用 `prisma migrate` 补齐外键 + `onDelete: Cascade`（需要配套迁移目录与生产变更窗口）。
 
 #### P0-6 数据库变更没有版本化，缺回滚路径
 
@@ -133,6 +158,19 @@
 
 ### P1 —— 上线前应完成
 
+#### P1-0 全项目 14 处错误响应返回 `success: true`（修复 P0 时发现，优先处理）
+
+- 现象：`apiSuccess({ error: '需要管理员权限' }, 403)` 实际返回 `{ success: true, data: { error: '...' } }`，HTTP 状态是 403 但 **body 里 success 是 true**。
+- 影响：前端全部按 `json.success` 判断，**403 会被当成成功**。例如 `src/app/admin/page.tsx:33`：
+  ```ts
+  if (json.success) { setStats(json.data); }   // data = { error: '需要管理员权限' }
+  else { setError(json.error || '获取数据失败'); }
+  ```
+  结果是管理页面把「需要管理员权限」当成统计数据渲染，**不报错、也不提示权限不足**。涉及所有 admin 接口（feedback / export / stats / users / invitation-codes）。
+- 分布：`grep -rn "apiSuccess({ error" src/` → 14 处。
+- 建议：全部改用 `apiError(message, status)`（`src/lib/api/response.ts` 已有，返回 `{ success: false, error }`）。前端逻辑不用动——它们本来就在 `else` 分支里处理 `json.error`。
+- 注意：改完要确认前端没有依赖 `success: true` 的旧行为（`src/app/admin/export/page.tsx` 与 `invitation-codes/page.tsx` 用的是 `!json.success` 分支，兼容）。
+
 #### P1-1 可观测性接近于零
 
 - 生产未配 `SENTRY_DSN` → `sentry.*.config.ts` 三份文件形同摆设，线上报错无人知。
@@ -143,7 +181,9 @@
 #### P1-2 核心业务没有测试保护
 
 58 个用例集中在 validators / scoring / api / auth-portal / registration-ticket。**真正会出事故的地方没有单测**：配额扣减、券的兑换与转让、分享码一次性、评估落库、报告分享过期、删号删档。
-- 建议：至少补 5 组 service 级用例（`deductQuota`/`transferCoupon`/`submitAttempt`/`deleteChild`/`onReferralRegistered`），并把 P0-1、P0-5 的修复用测试钉住。
+
+> 2026-10-28 进展：已补 `coupon-transfer`（8 例）与 `deletion`（8 例），总数 58 → **74**。
+> 剩下待补：`deductQuota` / `submitAttempt` / `onReferralRegistered` / `useCoupon` / `getSharedReport`。
 
 #### P1-3 积分与推荐奖励是 read-modify-write，并发下会双发
 
@@ -158,6 +198,14 @@
 - `cleanup.service.ts` 的「过期 PENDING 账户清理」只能靠手动调 `POST /api/maintenance/cleanup`（还需鉴权）。crontab 里没有任何应用级定时任务。
 - 影响：2 小时有效的预账户、过期券、过期分享批次不会被自动清理 → 库膨胀、脏数据累积、到期语义失效。
 - 建议：加一个最小调度（systemd timer 或独立脚本入口），清理走幂等逻辑；或者用 PostgreSQL 的定时任务扩展。
+
+#### P1-4之二 券系统是半成品（只生成、不能用）
+
+- 实测：`useCoupon` / `validateCouponCode` **全仓无调用点**；`AssessmentSession.couponId` 字段**从未被赋值**；前端**没有券码输入框**（`/assessment`、`/select-child`、`/report` 全都没有）。
+- 也就是说：**用户花积分换来的券码无处可用**。`/api/points/redeem` 只是弹一个 `alert` 显示券码（`src/app/membership/page.tsx:126`）。
+- `/api/coupons/transfer` 同样**没有前端调用方**，是孤立接口。
+- 影响：会员页展示的「荔心卷 / 升学指数 / trial 券」对用户是**无法兑现的承诺**；同时意味着券的归属校验（本次刚修好）暂时没有实际业务压力。
+- 建议：这是一个**产品决策**（D1）——要么上线前把券的兑换入口做出来（测评时选券、扣次时核销），要么把会员页的券相关文案下架。**不要留一个「能换不能用」的半成品。**
 
 #### P1-5 公开报告页会被搜索引擎收录（儿童隐私）
 
@@ -239,17 +287,19 @@
 
 ## 四、上线准入清单（DoD）
 
-- [ ] P0-1 券码转让越权已修 + 有单测（跨用户转让 → 403）
+- [ ] P0-1 券码转让越权已修 + 有单测（跨用户转让 → 403） —— ✅ **已完成（`e3ba1df`）**
 - [ ] P0-2 限流键改为可信 IP（或接 Redis）；伪造 `X-Forwarded-For` 无法绕过；登录加账户级失败锁定
 - [ ] P0-3 三个公开接口已加频控；`/api/bind` 已下线或加签
 - [ ] P0-4 所有码改用 `crypto.randomInt`；批次码位数提升
-- [ ] P0-5 schema 补 `onDelete: Cascade`；删孩子、删用户（含有测评记录的用户）实测通过；无孤儿数据
+- [ ] P0-5 schema 补 `onDelete: Cascade`；删孩子、删用户（含有测评记录的用户）实测通过；无孤儿数据 —— ✅ **已完成（`e3ba1df`，应用层显式删除；schema 补外键列为 P1-6 遗留）**
 - [ ] P0-6 生产改 `prisma migrate deploy`；上线前 `migrate diff` 出变更面并人工确认；迁移失败即中止
 - [ ] P0-7 备份有异机副本；磁盘降到 <70% 且有 80% 告警
+- [ ] P1-0 14 处 `apiSuccess({error}, 4xx)` 改 `apiError`（否则 403 被当成功）
 - [ ] P1-1 Sentry DSN 已配；health 真实探库；关键失败路径有告警
-- [ ] P1-2 5 组核心 service 单测补齐
+- [ ] P1-2 核心 service 单测补齐（已 74/74；剩 `deductQuota`/`submitAttempt`/`onReferralRegistered`/`useCoupon`/`getSharedReport`）
 - [ ] P1-3 积分/推荐奖励改事务 + 条件更新
 - [ ] P1-4 应用侧定时任务上线（清理过期账户/券/批次）
+- [ ] P1-4之二 券的兑换入口做出来（测评选券 + 扣次核销），或下架会员页的券文案
 - [ ] P1-5 分享报告页 noindex；`robots.ts` / `not-found.tsx` 补齐
 - [ ] P1-6 CSP 上线（先 report-only）
 - [ ] P1-8 管理操作审计表
