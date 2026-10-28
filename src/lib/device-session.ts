@@ -83,6 +83,21 @@ export async function saveProgress(
     });
   }
 
+  // 找不到「进行中」的记录时，先确认是不是这个视角已经提交过了。
+  // SessionAttempt 上有 (sessionId, questionnaireType) 唯一约束，
+  // 已提交的那条（有 report）占着这个坑，直接 create 会撞唯一约束抛 P2002 → 500。
+  // 这里显式区分两种情况：
+  //   - 已提交 → 明确报 409，让调用方知道该开新 session，而不是 500
+  //   - 确实没答过 → 正常新建
+  const submitted = await prisma.sessionAttempt.findFirst({
+    where: { sessionId: session.id, questionnaireType },
+    select: { id: true, report: { select: { id: true } } },
+  });
+
+  if (submitted?.report) {
+    throw new ApiError('该类型测评已提交，请开始新的测评', 409);
+  }
+
   return prisma.sessionAttempt.create({
     data: {
       sessionId: session.id,
