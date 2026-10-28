@@ -18,10 +18,13 @@ const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
  * POST /api/device/voice/answer
  * 语音答题：上传录音 → 识别 → 归一化成 1-5 → 落进度 → 返回下一题音频。
  *
- * body (multipart/form-data):
- * - audio              必填，录音文件
- * - sessionId          必填
- * - questionnaireType  必填
+ * body:
+ * - multipart/form-data：字段 audio（录音文件）、sessionId、questionnaireType
+ * - 或 application/octet-stream：请求体是裸音频字节，sessionId/questionnaireType 走 query
+ *
+ * 为什么要支持 octet-stream：
+ * 固件（复用虾哥 xiaozhi-esp32）把 VAD 切出来的 Opus 帧拼成一个 buffer 直接 POST 上来，
+ * 不走 multipart 的封装开销更小。实测 MiniMax ASR 直接接受 Opus 字节。
  *
  * 响应 data:
  * {
@@ -34,34 +37,57 @@ const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
  * }
  */
 export const POST = withDeviceAuth(async (request: NextRequest, device) => {
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    throw new ApiError('请求必须是 multipart/form-data', 400);
+  // 两种入参形态：
+  // ① multipart/form-data —— 通用，浏览器/模拟器用
+  // ② application/octet-stream —— 裸音频字节，固件用（省掉 multipart 封装）
+  const contentType = request.headers.get('content-type') || '';
+  const isRawAudio = contentType.includes('application/octet-stream');
+
+  let audioBytes: Buffer;
+  let filename: string;
+  let sessionId: string;
+  let rawQuestionnaireType: unknown;
+
+  if (isRawAudio) {
+    audioBytes = Buffer.from(await request.arrayBuffer());
+    filename = 'voice.opus';
+    const url = new URL(request.url);
+    sessionId = url.searchParams.get('sessionId') || '';
+    rawQuestionnaireType = url.searchParams.get('questionnaireType');
+  } else {
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      throw new ApiError('请求必须是 multipart/form-data 或 application/octet-stream', 400);
+    }
+
+    const audio = form.get('audio');
+    if (!audio || typeof audio === 'string') {
+      throw new ApiError('缺少音频文件（字段名 audio）', 400);
+    }
+    const file = audio as File;
+    audioBytes = Buffer.from(await file.arrayBuffer());
+    filename = file.name || 'voice.mp3';
+    sessionId = typeof form.get('sessionId') === 'string'
+      ? (form.get('sessionId') as string)
+      : '';
+    rawQuestionnaireType = form.get('questionnaireType');
   }
 
-  const audio = form.get('audio');
-  if (!audio || typeof audio === 'string') {
-    throw new ApiError('缺少音频文件（字段名 audio）', 400);
-  }
-  const file = audio as File;
-  if (file.size <= 0) {
+  if (audioBytes.length <= 0) {
     throw new ApiError('音频文件为空', 400);
   }
-  if (file.size > MAX_AUDIO_BYTES) {
+  if (audioBytes.length > MAX_AUDIO_BYTES) {
     throw new ApiError('音频文件超过 5MB 上限', 400);
   }
 
-  const sessionId = typeof form.get('sessionId') === 'string'
-    ? (form.get('sessionId') as string)
-    : '';
   if (!sessionId) {
     throw new ApiError('请提供 session ID', 400);
   }
 
   const questionnaireType = validateQuestionnaireType(
-    form.get('questionnaireType')
+    rawQuestionnaireType
   ) as DeviceQuestionnaireType;
 
   const { answers, stageId } = await loadVoiceContext(
@@ -85,8 +111,7 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
   }
 
   // ① 语音识别
-  const audioBuffer = Buffer.from(await file.arrayBuffer());
-  const recognizedText = await transcribe(audioBuffer, file.name || 'voice.mp3');
+  const recognizedText = await transcribe(audioBytes, filename);
 
   // ② 归一化成 1-5
   const normalized = await normalizeAnswer(recognizedText, {
