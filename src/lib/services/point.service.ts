@@ -377,16 +377,64 @@ export async function getUserCoupons(userId: string): Promise<any[]> {
 }
 
 /**
- * 转让券（解除用户绑定）
+ * 转让券（变更券的归属）
+ *
+ * 券码本身就是凭据，改归属必须校验权限：
+ *   - 普通用户：只能释放**自己名下**的券（解绑成通用券），不能把券指给别人
+ *   - 管理员：可以改任何券的归属
+ *
+ * 历史上这个函数不校验任何归属，知道券码就能把别人的券转走或置空，
+ * 属于越权（IDOR）。这里补上归属与状态校验。
  */
 export async function transferCoupon(
   code: string,
-  newOwnerId?: string
+  newOwnerId: string | null | undefined,
+  actor: { userId: string; role: string }
 ): Promise<void> {
+  const coupon = await prisma.coupon.findUnique({
+    where: { code },
+    select: { id: true, userId: true, status: true, expiresAt: true },
+  });
+
+  if (!coupon) {
+    throw new Error('券码不存在');
+  }
+
+  if (coupon.status === 'used') {
+    throw new Error('券码已使用，不能转让');
+  }
+
+  if (coupon.expiresAt < new Date()) {
+    throw new Error('券码已过期，不能转让');
+  }
+
+  const isAdmin = actor.role === 'ADMIN';
+  const targetOwnerId = newOwnerId || null;
+
+  if (!isAdmin) {
+    // 普通用户只能操作自己的券
+    if (coupon.userId !== actor.userId) {
+      throw new Error('无权操作他人的券码');
+    }
+    // 且只能解绑（转成通用券），不能指定新的归属人
+    if (targetOwnerId !== null) {
+      throw new Error('无权将券转让给其他用户');
+    }
+  }
+
+  // 目标用户必须存在
+  if (targetOwnerId) {
+    const target = await prisma.user.findUnique({
+      where: { id: targetOwnerId },
+      select: { id: true },
+    });
+    if (!target) {
+      throw new Error('目标用户不存在');
+    }
+  }
+
   await prisma.coupon.update({
     where: { code },
-    data: {
-      userId: newOwnerId || null,
-    },
+    data: { userId: targetOwnerId },
   });
 }

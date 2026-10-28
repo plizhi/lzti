@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { ApiError } from '@/lib/api/response';
 import { validateChildData } from '@/lib/validators';
+import { deleteChildTree } from './deletion.service';
 
 export async function getChildren(userId: string) {
   const children = await prisma.child.findMany({
@@ -136,15 +137,15 @@ export async function deleteChild(childId: string, userId: string) {
     throw new ApiError('孩子档案不存在', 404);
   }
 
-  // 级联删除：先删除关联的 sessions（会级联删除 attempts 和 reports）
-  await prisma.assessmentSession.deleteMany({
-    where: { childId },
-  });
-
-  // 删除孩子档案
-  await prisma.child.delete({
-    where: { id: childId },
-  });
+  // 库里 Child -> AssessmentSession -> SessionAttempt -> AttemptReport 的外键
+  // 都是 RESTRICT，数据库不会自动级联。必须按依赖顺序显式删，
+  // 否则只删 session 会撞 FK 报错（而且 attempt/report 会全部留下）。
+  await prisma.$transaction(
+    async (tx) => {
+      await deleteChildTree(tx, childId);
+    },
+    { timeout: 15000, maxWait: 5000 }
+  );
 
   return { success: true };
 }

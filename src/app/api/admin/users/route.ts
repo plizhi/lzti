@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server';
 import { withAuth, apiSuccess } from '@/lib/api/handler';
+import { apiError } from '@/lib/api/response';
 import { prisma } from '@/lib/db';
+import { deleteUserCascade } from '@/lib/services/deletion.service';
+import { ApiError } from '@/lib/api/response';
 
 export const GET = withAuth(async (request, context) => {
   // 检查管理员权限
@@ -67,19 +70,18 @@ export const DELETE = withAuth(async (request: NextRequest, context) => {
     return apiSuccess({ error: '不能删除自己' }, 400);
   }
 
-  // 级联删除相关数据
-  await prisma.$transaction([
-    // 删除用户的邀请码
-    prisma.userInviteCode.deleteMany({ where: { userId } }),
-    // 删除用户的分享批次
-    prisma.shareBatch.deleteMany({ where: { userId } }),
-    // 删除用户的报告分享
-    prisma.reportShare.deleteMany({ where: { ownerId: userId } }),
-    // 删除用户的孩子
-    prisma.child.deleteMany({ where: { userId } }),
-    // 删除用户
-    prisma.user.delete({ where: { id: userId } }),
-  ]);
+  // 级联删除相关数据。
+  // 库里的外键是 RESTRICT，原来的 deleteMany 顺序（先删批次、后删 slot）会撞 FK，
+  // 整个事务回滚 —— 也就是「有分享记录的用户根本删不掉」。改为按依赖顺序显式删除。
+  try {
+    await deleteUserCascade(userId);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return apiError(error.message, error.status);
+    }
+    console.error('Delete user error:', error);
+    return apiError('删除用户失败', 500);
+  }
 
   return apiSuccess({ deleted: true });
 });
