@@ -52,6 +52,60 @@ model User {
   shareRewards  ShareReward[]
   pointTransactions PointTransaction[]
   coupons       Coupon[]
+  devices       Device[]
+}
+
+// ============================================
+// 设备接入（ESP32 答题手柄）
+// ============================================
+
+// 设备（答题手柄）
+// deviceKey 是硬件出厂标识（MAC 派生），一台设备只属于一个用户
+model Device {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String    @default("测评手柄")
+  deviceKey   String    @unique  // 硬件出厂标识
+  status      String    @default("active")  // active | revoked
+  lastSeenAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  user   User          @relation(fields: [userId], references: [id])
+  tokens DeviceToken[]
+
+  @@index([userId])
+  @@map("devices")
+}
+
+// 设备令牌
+// 服务端只存 sha256 摘要，明文只在签发时返回一次
+model DeviceToken {
+  id        String    @id @default(cuid())
+  deviceId  String
+  tokenHash String    @unique  // sha256(rawToken) hex
+  expiresAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId])
+  @@map("device_tokens")
+}
+
+// 配对码
+// 用户在手机/网页端生成，10 分钟过期，一次性使用
+model DevicePairingCode {
+  id        String    @id @default(cuid())
+  userId    String
+  code      String    @unique  // 6 位数字
+  deviceKey String?   // 使用后回填
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("device_pairing_codes")
 }
 
 // 分享批次
