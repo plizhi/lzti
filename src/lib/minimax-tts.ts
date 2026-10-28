@@ -28,7 +28,14 @@ function isErrorPayload(payload: unknown): boolean {
 /**
  * 语音合成：把文字转成 mp3
  */
-export async function speak(text: string): Promise<Buffer> {
+export interface SpeakOptions {
+  /** 语速，1 是正常，0.9 是慢 10% */
+  speed?: number;
+  /** 音色 */
+  voiceId?: string;
+}
+
+export async function speak(text: string, options: SpeakOptions = {}): Promise<Buffer> {
   const key = getApiKey();
   const content = text.trim();
   if (!content) {
@@ -41,8 +48,8 @@ export async function speak(text: string): Promise<Buffer> {
     stream: false,
     // voice_setting / audio_setting 都不能缺，缺字段 MiniMax 会报 2013
     voice_setting: {
-      voice_id: 'female-shaonv',
-      speed: 1,
+      voice_id: options.voiceId ?? 'female-shaonv',
+      speed: options.speed ?? 1,
       vol: 1,
       pitch: 0,
       emotion: 'happy',
@@ -105,7 +112,7 @@ export async function speak(text: string): Promise<Buffer> {
 /**
  * 语音合成并转成 base64（随响应体返回给设备）
  */
-export async function speakToBase64(text: string): Promise<string> {
-  const buffer = await speak(text);
+export async function speakToBase64(text: string, options: SpeakOptions = {}): Promise<string> {
+  const buffer = await speak(text, options);
   return buffer.toString('base64');
 }
