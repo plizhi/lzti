@@ -314,11 +314,22 @@ export async function submitAttempt(
     throw new ApiError('测评会话不存在', 404);
   }
 
+  // 同一 session 同一视角只能有一条 attempt（唯一约束 sessionId+questionnaireType）。
+  // 但这条记录有两种来源，含义完全不同：
+  //   ① 「已提交」：有 report，是真正提交完成的测评
+  //   ② 「进行中」：只有 progress 没有 report，是网页端答题时自动保存的中间态
+  //
+  // 历史上这里只按 sessionId+questionnaireType 查一次，存在即报「已提交」，
+  // 于是网页端只要中途保存过进度（防抖 1 秒自动保存），提交就必然失败——
+  // 「保存进度」占用了唯一约束的坑，「提交」再插就撞唯一约束。
+  // 现按 report 是否存在区分：已提交才拒绝；进行中的记录就地复用（覆盖答案），
+  // 不新建行，避免撞唯一约束，也避免家长已答的题丢失。
   const existingAttempt = await prisma.sessionAttempt.findFirst({
     where: { sessionId, questionnaireType },
+    include: { report: { select: { id: true } } },
   });
 
-  if (existingAttempt) {
+  if (existingAttempt?.report) {
     throw new ApiError('该类型测评已提交', 400);
   }
 
@@ -360,8 +371,13 @@ export async function submitAttempt(
     // 于是不会把「家长视角」和「孩子视角」都当成首个视角。
     await tx.$queryRaw`SELECT id FROM "AssessmentSession" WHERE id = ${sessionId} FOR UPDATE`;
 
-    const attemptCount = await tx.sessionAttempt.count({ where: { sessionId } });
-    const isFirstAttempt = attemptCount === 0;
+    // 配额只按「真正提交完成」的 attempt 计算。
+    // 若把「进行中」的进度记录也算进来，家长只要中途保存过进度，
+    // attemptCount 就已经是 1，首个视角就会漏扣次数（等于白送一次测评）。
+    const submittedCount = await tx.sessionAttempt.count({
+      where: { sessionId, report: { isNot: null } },
+    });
+    const isFirstAttempt = submittedCount === 0;
 
     if (userId && isFirstAttempt) {
       const quotaCheck = await checkQuota(userId, tx);
@@ -374,16 +390,39 @@ export async function submitAttempt(
       }
     }
 
+    // 锁内重新查一次：事务外那次查询到此刻之间，记录可能已被提交。
+    const inFlight = await tx.sessionAttempt.findFirst({
+      where: { sessionId, questionnaireType },
+      include: { report: { select: { id: true } } },
+    });
+
+    if (inFlight?.report) {
+      throw new ApiError('该类型测评已提交', 400);
+    }
+
+    const attemptData = {
+      childId: session.childId,
+      stageId: session.stageId,
+      answers: data.answers,
+      scores,
+      quadrants,
+    };
+
     try {
+      if (inFlight) {
+        // 复用「进行中」的那一行：覆盖成正式答案。
+        // 进度记录建出来时 childId/stageId 是空串（见 progress 路由），这里补上。
+        return await tx.sessionAttempt.update({
+          where: { id: inFlight.id },
+          data: { ...attemptData, progress: data.answers },
+        });
+      }
+
       return await tx.sessionAttempt.create({
         data: {
           sessionId,
-          childId: session.childId,
           questionnaireType,
-          stageId: session.stageId,
-          answers: data.answers,
-          scores,
-          quadrants,
+          ...attemptData,
         },
       });
     } catch (err) {
