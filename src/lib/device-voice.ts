@@ -25,6 +25,8 @@ export interface VoiceQuestionState {
   /** 当前题（第一个未答的题） */
   questionId: string;
   questionText: string;
+  /** 所属维度名，如「学习兴趣」——设备端测评 UI 要显示 */
+  dimensionName: string;
   /** 全局题序，从 1 开始 */
   questionNumber: number;
   totalQuestions: number;
@@ -61,10 +63,15 @@ export async function buildVoiceQuestion(
   const scale = questions.scale;
 
   // 展平所有维度的题目，保持与 globalIndex 一致的顺序
-  const flat: Array<{ id: string; text: string; globalIndex: number }> = [];
+  const flat: Array<{ id: string; text: string; globalIndex: number; dimensionName: string }> = [];
   for (const dim of questions.dimensions) {
     for (const q of dim.questions) {
-      flat.push({ id: q.id, text: q.text, globalIndex: q.globalIndex });
+      flat.push({
+        id: q.id,
+        text: q.text,
+        globalIndex: q.globalIndex,
+        dimensionName: dim.name,
+      });
     }
   }
   flat.sort((a, b) => a.globalIndex - b.globalIndex);
@@ -76,6 +83,7 @@ export async function buildVoiceQuestion(
     return {
       questionId: '',
       questionText: '',
+      dimensionName: '',
       questionNumber: flat.length,
       totalQuestions: flat.length,
       answeredCount: flat.length,
@@ -97,6 +105,7 @@ export async function buildVoiceQuestion(
   return {
     questionId: next.id,
     questionText: next.text,
+    dimensionName: next.dimensionName,
     questionNumber: next.globalIndex + 1,
     totalQuestions: flat.length,
     answeredCount: Object.keys(answers).length,
