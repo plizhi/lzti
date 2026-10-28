@@ -23,8 +23,15 @@ const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
  * - 或 application/octet-stream：请求体是裸音频字节，sessionId/questionnaireType 走 query
  *
  * 为什么要支持 octet-stream：
- * 固件（复用虾哥 xiaozhi-esp32）把 VAD 切出来的 Opus 帧拼成一个 buffer 直接 POST 上来，
- * 不走 multipart 的封装开销更小。实测 MiniMax ASR 直接接受 Opus 字节。
+ * 固件（复用虾哥 xiaozhi-esp32）把 VAD 切出来的音频帧拼成一个 buffer 直接 POST 上来，
+ * 不走 multipart 的封装开销更小。
+ *
+ * ⚠️ 音频格式的重要约束（2026-10-28 实测）：
+ * MiniMax ASR **接受 Ogg Opus 容器**，但**拒绝裸 Opus 包流**
+ * （裸包流报 2013 "Invalid data found when processing input"）。
+ * 而乐鑫的 esp_opus_enc_process 输出的是**裸 Opus 包**（不做 Ogg 封装），
+ * 所以固件侧若直接发裸包，这里必须先封成 Ogg 再调 ASR，否则会 502。
+ * 封 Ogg 的实现见 lzti-dev/ws-server/src/ogg-opus.mjs（OpusHead 必须单独占 BOS 页）。
  *
  * 响应 data:
  * {
