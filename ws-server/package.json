@@ -1,0 +1,15 @@
+{
+  "name": "lzti-ws-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "虾哥协议兼容的 WebSocket 服务端（ESP32 语音测评）",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  }
+}
