@@ -1,12 +1,27 @@
 // 初三（初三大）问卷数据
 
-import type { Questionnaire, Question } from '@/types/questionnaire';
+import type { Questionnaire, Dimension, Question } from '@/types/questionnaire';
 
-export const strategyIntegrationDimension = {
+export const strategyIntegrationDimension: Dimension = {
   id: 'strategy-integration',
   name: '策略整合',
   description: '在时间不够用的情况下，做出有效的取舍和安排',
-  axes: ['self-rhythm', 'tradeoff-judgment'] as [string, string],
+  axes: [
+    {
+      id: 'self-rhythm',
+      name: '自我节奏感',
+      description: '是否清楚自己每天先做什么后做什么，有自己的复习节奏',
+      positiveLabel: '节奏自主',
+      negativeLabel: '依赖安排',
+    },
+    {
+      id: 'tradeoff-judgment',
+      name: '取舍判断力',
+      description: '时间不够时是否知道先保什么、哪些科目可以少花时间',
+      positiveLabel: '善于取舍',
+      negativeLabel: '轻重不分',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '策略整合型', description: '既有自己的复习节奏，又会根据情况做取舍。复习效率最高的状态。', guidance: '提供挑战性任务，鼓励其分享复习策略，帮助其看到自己的优势。' },
     { id: 'strategy', name: '按部就班型', description: '有自己的节奏，但不善于区分轻重缓急。认真但效率有提升空间。', guidance: '肯定其稳定性，帮助其发现"哪些事可以少花时间"的空间。' },
@@ -15,11 +30,26 @@ export const strategyIntegrationDimension = {
   ],
 };
 
-export const goalAnchorDimension = {
+export const goalAnchorDimension: Dimension = {
   id: 'goal-anchor',
   name: '目标锚定',
   description: '在长期高压的备考中，心里有没有一个方向在拉着往前走',
-  axes: ['meaning-perception', 'self-confirmation'] as [string, string],
+  axes: [
+    {
+      id: 'meaning-perception',
+      name: '意义感知',
+      description: '能否从学习本身感到有意思、心里是否有方向',
+      positiveLabel: '目标感清晰',
+      negativeLabel: '目标感薄弱',
+    },
+    {
+      id: 'self-confirmation',
+      name: '自我确认',
+      description: '一次考砸是否就否定自己',
+      positiveLabel: '自我稳定',
+      negativeLabel: '容易否定自己',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '意义驱动型', description: '能从学习本身获得乐趣，也不会因为考试波动否定自己。目标感最稳定的状态。', guidance: '保护其内在动机，肯定其过程中的收获，不把成绩当作唯一衡量标准。' },
     { id: 'strategy', name: '兴趣脆弱型', description: '对学习本身有兴趣，但自我价值感不稳定。考砸后兴趣也可能跟着动摇。', guidance: '帮助建立"分数不等于价值"的认知，在考砸后刻意寻找其做得好的地方。' },
@@ -28,11 +58,26 @@ export const goalAnchorDimension = {
   ],
 };
 
-export const feedbackUtilizationDimension = {
+export const feedbackUtilizationDimension: Dimension = {
   id: 'feedback-utilization',
   name: '反馈利用',
   description: '考完试之后，能不能从考试结果中提取有用的信息，指导下一步',
-  axes: ['review-action', 'information-transformation'] as [string, string],
+  axes: [
+    {
+      id: 'review-action',
+      name: '复盘行动',
+      description: '考完后是否翻卷子、弄明白自己错在哪',
+      positiveLabel: '主动复盘',
+      negativeLabel: '考完就过',
+    },
+    {
+      id: 'information-transformation',
+      name: '信息转化',
+      description: '能否把考试结果转成接下来该重点补什么',
+      positiveLabel: '转化为行动',
+      negativeLabel: '信息流失',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '有效利用型', description: '既会认真复盘，也能从考试中拿到有用的信息指导下一步。反馈利用最成熟的状态。', guidance: '肯定其复盘习惯，鼓励其总结复盘方法，形成可迁移的策略。' },
     { id: 'strategy', name: '复盘未转化型', description: '会认真看卷子，但不太清楚接下来该重点补什么。缺的是从"知道错了"到"知道该做什么"。', guidance: '在复盘后追问"那你打算怎么补"，帮助其完成从"看到错"到"知道做"的转化。' },
@@ -41,11 +86,26 @@ export const feedbackUtilizationDimension = {
   ],
 };
 
-export const mentalStabilityDimension = {
+export const mentalStabilityDimension: Dimension = {
   id: 'mental-stability',
   name: '心态稳定',
   description: '在排名波动、社会比较、家长期待的多重压力下，能不能保持心态的基本稳定',
-  axes: ['emotion-recovery', 'support-connection'] as [string, string],
+  axes: [
+    {
+      id: 'emotion-recovery',
+      name: '情绪恢复',
+      description: '心情不好或压力大时，能否较快缓过来并保持复习节奏',
+      positiveLabel: '恢复得快',
+      negativeLabel: '恢复得慢',
+    },
+    {
+      id: 'support-connection',
+      name: '支持连接',
+      description: '有心事时是否愿意找人说说，外部支持是否用得上',
+      positiveLabel: '愿意连接',
+      negativeLabel: '独自承担',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '韧性充沛型', description: '既能自己较快恢复，也愿意在需要时找人聊聊。心态稳定的理想状态。', guidance: '保持现状，避免过度干预。可以鼓励其成为同伴的支持者。' },
     { id: 'strategy', name: '独立调节型', description: '自己能较快调整情绪，但不习惯找人倾诉。内在调节能力较强，外部支持连接可以加强。', guidance: '肯定其自我调节能力，同时创造"说说也没关系"的氛围，让其知道支持资源一直在。' },

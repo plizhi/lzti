@@ -1,12 +1,27 @@
 // 高一高二问卷数据（定稿版）
 
-import type { Questionnaire, Question } from '@/types/questionnaire';
+import type { Questionnaire, Dimension, Question } from '@/types/questionnaire';
 
-export const selfCognitionDimension = {
+export const selfCognitionDimension: Dimension = {
   id: 'self-cognition',
   name: '自我认知',
   description: '孩子是否开始了解自己是什么样的人，能不能接纳自己的不完美',
-  axes: ['self-awareness', 'self-acceptance'] as [string, string],
+  axes: [
+    {
+      id: 'self-awareness',
+      name: '自我觉察',
+      description: '是否清楚自己擅长什么、不擅长什么',
+      positiveLabel: '认知清晰',
+      negativeLabel: '认知模糊',
+    },
+    {
+      id: 'self-acceptance',
+      name: '自我接纳',
+      description: '面对不足和批评时能否保持平稳，不全盘否定自己',
+      positiveLabel: '接纳自己',
+      negativeLabel: '苛责自己',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '自知自洽型', description: '既了解自己，也能接纳自己。', guidance: '保护自我认知的稳定性，鼓励分享自我认知的经验。' },
     { id: 'strategy', name: '苛责清晰型', description: '了解自己，但对自己要求很严，容易否定自己。', guidance: '帮助建立更友善的自我对话方式，区分"做不好"和"人不好"。' },
@@ -15,11 +30,26 @@ export const selfCognitionDimension = {
   ],
 };
 
-export const directionExplorationDimension = {
+export const directionExplorationDimension: Dimension = {
   id: 'direction-exploration',
   name: '方向探索',
   description: '孩子对未来的方向有没有一些想法，有没有在尝试和探索中寻找自己真正喜欢的事',
-  axes: ['direction-awareness', 'exploration-action'] as [string, string],
+  axes: [
+    {
+      id: 'direction-awareness',
+      name: '方向觉察',
+      description: '对未来是否有一些初步的想法或方向',
+      positiveLabel: '方向初明',
+      negativeLabel: '方向模糊',
+    },
+    {
+      id: 'exploration-action',
+      name: '探索行动',
+      description: '是否主动接触和尝试不同领域，从尝试中筛出方向',
+      positiveLabel: '边试边找',
+      negativeLabel: '等待确定',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '探索行动型', description: '有方向感，也在积极尝试。', guidance: '保护探索动力，协助评估方向的可行性和风险。' },
     { id: 'strategy', name: '想法待动型', description: '有想法但还没怎么行动。', guidance: '帮助将想法转化为最小行动步骤，从第一步开始。' },
@@ -28,11 +58,26 @@ export const directionExplorationDimension = {
   ],
 };
 
-export const academicStrategyDimension = {
+export const academicStrategyDimension: Dimension = {
   id: 'academic-strategy',
   name: '学业策略',
   description: '孩子有没有形成自己的学习方法，遇到难题时会不会变通',
-  axes: ['method-awareness', 'flexibility'] as [string, string],
+  axes: [
+    {
+      id: 'method-awareness',
+      name: '方法自觉',
+      description: '是否形成自己的一套学习方法，而不只跟着老师走',
+      positiveLabel: '方法自成',
+      negativeLabel: '依赖跟随',
+    },
+    {
+      id: 'flexibility',
+      name: '方法灵活度',
+      description: '一种方法不管用时是否会换一种试试',
+      positiveLabel: '能变通',
+      negativeLabel: '方法单一',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '策略灵活型', description: '有自己的方法，也会灵活调整。', guidance: '鼓励策略总结和迁移，培养元认知能力。' },
     { id: 'strategy', name: '策略单一型', description: '有自己的方法，但遇到新情况不太会变通。', guidance: '引入策略菜单，通过对比体验让其在实践中发现新方法的价值。' },
@@ -41,11 +86,26 @@ export const academicStrategyDimension = {
   ],
 };
 
-export const supportConnectionDimension = {
+export const supportConnectionDimension: Dimension = {
   id: 'support-connection',
   name: '支持连接',
   description: '孩子是否感知到身边有人在支持自己，遇到困难时会不会主动求助',
-  axes: ['support-awareness', 'active-connection'] as [string, string],
+  axes: [
+    {
+      id: 'support-awareness',
+      name: '支持感知',
+      description: '是否感觉到身边有人关心支持自己、有可以求助的关系',
+      positiveLabel: '感到被支持',
+      negativeLabel: '感觉孤立',
+    },
+    {
+      id: 'active-connection',
+      name: '主动连接',
+      description: '遇到困难时是否主动找人聊聊或求助',
+      positiveLabel: '主动求助',
+      negativeLabel: '独自硬扛',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '主动连接型', description: '知道身边有人支持，也会主动求助。', guidance: '保持支持网络，同时鼓励成为他人的支持来源。' },
     { id: 'strategy', name: '感知未用型', description: '知道有人支持，但不太会主动连接。', guidance: '创造非正式的连接机会，让"求助"变成日常小事。' },

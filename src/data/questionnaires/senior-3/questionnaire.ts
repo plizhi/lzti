@@ -1,12 +1,27 @@
 // 高三问卷数据（定稿版）
 
-import type { Questionnaire, Question } from '@/types/questionnaire';
+import type { Questionnaire, Dimension, Question } from '@/types/questionnaire';
 
-export const decisionClarityDimension = {
+export const decisionClarityDimension: Dimension = {
   id: 'decision-clarity',
   name: '决策清晰度',
   description: '在高考这个明确的节点上，能不能做出自己的选择，这个选择是不是经过认真思考的',
-  axes: ['choice-clarity', 'independent-decision'] as [string, string],
+  axes: [
+    {
+      id: 'choice-clarity',
+      name: '方向清晰度',
+      description: '对以后想走的方向是否心里有数，面对不确定能否不焦虑',
+      positiveLabel: '方向清楚',
+      negativeLabel: '方向未定',
+    },
+    {
+      id: 'independent-decision',
+      name: '自主决策力',
+      description: '重要选择是否自己认真想过、能说出自己的理由',
+      positiveLabel: '自主判断',
+      negativeLabel: '跟随他人',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '自主决策型', description: '方向清楚，选择来自自己。', guidance: '尊重孩子的选择，在需要时提供信息支持。' },
     { id: 'strategy', name: '清晰从众型', description: '有方向，但这个方向可能更多是跟着大家走或听父母的。', guidance: '温和地帮助孩子区分"是父母的愿望"还是"我真正想要的"。' },
@@ -15,11 +30,26 @@ export const decisionClarityDimension = {
   ],
 };
 
-export const goalActionDimension = {
+export const goalActionDimension: Dimension = {
   id: 'goal-action',
   name: '目标行动力',
   description: '有没有明确的目标，正在为目标做具体的事情',
-  axes: ['goal-specificity', 'action-consistency'] as [string, string],
+  axes: [
+    {
+      id: 'goal-specificity',
+      name: '目标明确度',
+      description: '是否说得出想达到什么水平和具体目标',
+      positiveLabel: '目标具体',
+      negativeLabel: '目标笼统',
+    },
+    {
+      id: 'action-consistency',
+      name: '行动一致度',
+      description: '每天做的事是否和心里想达到的目标方向一致，想法是否真在做',
+      positiveLabel: '言行一致',
+      negativeLabel: '想法未落地',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '知行合一型', description: '有明确目标，也在持续行动。', guidance: '帮助保持动力，在关键时刻给予鼓励。' },
     { id: 'strategy', name: '目标空悬型', description: '有明确目标，但行动上还没有跟上。', guidance: '帮助拆解目标为最小行动步骤，从第一步开始。' },
@@ -28,11 +58,26 @@ export const goalActionDimension = {
   ],
 };
 
-export const pressureResilienceDimension = {
+export const pressureResilienceDimension: Dimension = {
   id: 'pressure-resilience',
   name: '压力韧性',
   description: '在高考的持续高压下，能不能调节自己的情绪，能不能保持基本的复习节奏',
-  axes: ['emotion-regulation', 'action-maintenance'] as [string, string],
+  axes: [
+    {
+      id: 'emotion-regulation',
+      name: '情绪调节力',
+      description: '压力大时是否有健康的方式让自己缓过来',
+      positiveLabel: '调节有方',
+      negativeLabel: '调节不足',
+    },
+    {
+      id: 'action-maintenance',
+      name: '行动维持力',
+      description: '高压阶段能否保持基本的学习投入和复习节奏',
+      positiveLabel: '高压下坚持',
+      negativeLabel: '压力下停滞',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '韧性稳定型', description: '能调节情绪，也能保持行动。', guidance: '保持现状，避免过度施压。' },
     { id: 'strategy', name: '调节未行型', description: '能调节情绪，但行动节奏容易被压力打乱。', guidance: '帮助建立"行动优先"的习惯，用行动带动情绪。' },
@@ -41,11 +86,26 @@ export const pressureResilienceDimension = {
   ],
 };
 
-export const relationshipAutonomyDimension = {
+export const relationshipAutonomyDimension: Dimension = {
   id: 'relationship-autonomy',
   name: '关系自主',
   description: '在志愿选择、未来规划等重要问题上，能不能和父母顺畅沟通，同时保持独立判断',
-  axes: ['communication-quality', 'independent-boundary'] as [string, string],
+  axes: [
+    {
+      id: 'communication-quality',
+      name: '沟通质量',
+      description: '关于未来和选择的话题能否好好聊、不轻易冲突',
+      positiveLabel: '沟通顺畅',
+      negativeLabel: '沟通冲突',
+    },
+    {
+      id: 'independent-boundary',
+      name: '自主边界',
+      description: '重要决定是否参与意见但由自己拍板，并对结果负责',
+      positiveLabel: '自主有主见',
+      negativeLabel: '依赖家人',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '协商自主型', description: '能和父母顺畅沟通，同时保持独立判断。', guidance: '保持现状，尊重孩子的成长。' },
     { id: 'strategy', name: '和谐依赖型', description: '沟通顺畅，但容易过度依赖父母意见。', guidance: '温和地鼓励独立思考，肯定其想法的价值。' },

@@ -1,12 +1,27 @@
 // 初中非毕业年级（初一、初二）问卷数据
 
-import type { Questionnaire, Question } from '@/types/questionnaire';
+import type { Questionnaire, Dimension, Question } from '@/types/questionnaire';
 
-export const multiTaskManagementDimension = {
+export const multiTaskManagementDimension: Dimension = {
   id: 'multi-task-management',
   name: '多任务管理',
   description: '任务条理性和执行能力',
-  axes: ['organization', 'execution'] as [string, string],
+  axes: [
+    {
+      id: 'organization',
+      name: '任务条理',
+      description: '是否清楚当天有哪些任务、先后顺序如何、物品是否整理有序',
+      positiveLabel: '有条有理',
+      negativeLabel: '杂乱无序',
+    },
+    {
+      id: 'execution',
+      name: '执行落实',
+      description: '能否较快进入状态、按计划把任务做完',
+      positiveLabel: '执行到位',
+      negativeLabel: '计划落空',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '统筹兼顾型', description: '有清晰的任务清单和优先级，并能高效执行。', guidance: '提高任务的挑战性，引入长期项目制管理，培养其带领他人的能力。' },
     { id: 'strategy', name: '纸上谈兵型', description: '能做出完美的计划表，但严重缺乏执行。', guidance: '做减法，从日计划缩到只规划接下来1小时，设置极小的启动目标。' },
@@ -15,11 +30,26 @@ export const multiTaskManagementDimension = {
   ],
 };
 
-export const goalPlanningDimension = {
+export const goalPlanningDimension: Dimension = {
   id: 'goal-planning',
   name: '目标规划',
   description: '目标清晰度和路径分解能力',
-  axes: ['goal-clarity', 'path-decomposition'] as [string, string],
+  axes: [
+    {
+      id: 'goal-clarity',
+      name: '目标清晰度',
+      description: '是否知道想去的学校、想达到的水平，学习是否有意义感',
+      positiveLabel: '目标明确',
+      negativeLabel: '目标模糊',
+    },
+    {
+      id: 'path-decomposition',
+      name: '路径拆解力',
+      description: '能否把大目标拆成阶段和小目标，并按时完成',
+      positiveLabel: '会拆解',
+      negativeLabel: '停在口号',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '志存高远型', description: '有清晰远大的目标，并能一步步拆解为当下的行动计划。', guidance: '协助评估路径的合理性，关注过程中的心理调适。' },
     { id: 'strategy', name: '空想家型', description: '有美好向往的目标，但完全不知如何实现。', guidance: '帮助"画地图"，引入"以终为始"的倒推法，锁定第一个最小的突破口。' },
@@ -28,11 +58,26 @@ export const goalPlanningDimension = {
   ],
 };
 
-export const academicAttributionDimension = {
+export const academicAttributionDimension: Dimension = {
   id: 'academic-attribution',
   name: '学业归因',
   description: '对成败的解释方式',
-  axes: ['controllability', 'flexibility'] as [string, string],
+  axes: [
+    {
+      id: 'controllability',
+      name: '努力可控感',
+      description: '是否相信结果可以通过自己的努力和方法改变',
+      positiveLabel: '努力可控',
+      negativeLabel: '努力不可控',
+    },
+    {
+      id: 'flexibility',
+      name: '归因灵活度',
+      description: '能否把失败拆到具体步骤，而不是全盘否定自己或归咎运气',
+      positiveLabel: '归因灵活',
+      negativeLabel: '归因固化',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '成长型思维', description: '把成功归因为努力和方法，失败归因为需要调整环节。', guidance: '持续强化过程，而非赞美"聪明"。' },
     { id: 'strategy', name: '自负型思维', description: '把成功归因于"聪明"，把失败归因于外部。', guidance: '赞美要具体指向"努力"而非"聪明"，用略有挑战的任务体验失败。' },
@@ -41,11 +86,26 @@ export const academicAttributionDimension = {
   ],
 };
 
-export const emotionalResilienceDimension = {
+export const emotionalResilienceDimension: Dimension = {
   id: 'emotional-resilience',
   name: '情绪韧性',
   description: '情绪敏感度和调节能力',
-  axes: ['sensitivity', 'regulation'] as [string, string],
+  axes: [
+    {
+      id: 'sensitivity',
+      name: '情绪抗扰性',
+      description: '别人的评价和一次挫折是否容易让自己长时间难受',
+      positiveLabel: '不易受影响',
+      negativeLabel: '容易被影响',
+    },
+    {
+      id: 'regulation',
+      name: '情绪调节力',
+      description: '烦躁或压力大时是否有办法排解、能否较快恢复状态',
+      positiveLabel: '调节有方',
+      negativeLabel: '调节不足',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '大心脏型', description: '心理承受能力强，不容易被小事扰动，能快速消化。', guidance: '教会共情，避免因过于钝感而无意中伤害敏感的同学。' },
     { id: 'strategy', name: '玻璃心型', description: '极其敏感，一次失利或一句评价就能让他们崩溃，且长时间难以平复。', guidance: '先进行情绪辅导，教他识别情绪、为情绪命名，通过安全方式外化。' },

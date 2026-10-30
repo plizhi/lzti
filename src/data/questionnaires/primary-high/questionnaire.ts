@@ -1,12 +1,27 @@
 // 小学高年级（3-6年级）问卷数据
 
-import type { Questionnaire, Question } from '@/types/questionnaire';
+import type { Questionnaire, Dimension, Question } from '@/types/questionnaire';
 
-export const selfEfficacyDimension = {
+export const selfEfficacyDimension: Dimension = {
   id: 'self-efficacy',
   name: '自我效能',
   description: '对学习能力的信念和努力的态度',
-  axes: ['ability-belief', 'effort-belief'] as [string, string],
+  axes: [
+    {
+      id: 'ability-belief',
+      name: '能力观',
+      description: '是否相信学习能力可以不断提升，而不是天生固定',
+      positiveLabel: '能力可成长',
+      negativeLabel: '能力固定',
+    },
+    {
+      id: 'effort-belief',
+      name: '努力观',
+      description: '是否相信努力和正确方法能解决大部分学习问题',
+      positiveLabel: '努力有用',
+      negativeLabel: '努力无用',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '成长掌控型', description: '相信能力可成长，也相信努力有用。面对挑战主动投入。', guidance: '持续强化"努力+策略"的归因模式，在成功时引导其看到具体是哪个方法起了作用。' },
     { id: 'strategy', name: '勤能补拙型', description: '认为能力相对固定，但相信努力可以弥补。愿意下功夫。', guidance: '肯定勤奋品质，同时引导其发现努力之外策略的价值，逐步松动"只能靠拼命"的信念。' },
@@ -15,11 +30,26 @@ export const selfEfficacyDimension = {
   ],
 };
 
-export const strategyCopingDimension = {
+export const strategyCopingDimension: Dimension = {
   id: 'strategy-coping',
   name: '策略应对',
   description: '遇到困难时的应对方式和策略灵活性',
-  axes: ['coping-proactivity', 'method-flexibility'] as [string, string],
+  axes: [
+    {
+      id: 'coping-proactivity',
+      name: '应对主动性',
+      description: '遇到困难时是否主动想办法，而不是等着别人给答案',
+      positiveLabel: '主动应对',
+      negativeLabel: '被动等待',
+    },
+    {
+      id: 'method-flexibility',
+      name: '方法灵活度',
+      description: '能否根据不同学科和题目尝试不同方法',
+      positiveLabel: '方法多样',
+      negativeLabel: '方法单一',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '灵活应对型', description: '遇到困难主动想办法，且方法多样，会根据情况调整策略。', guidance: '帮助其总结和命名自己的策略，形成可迁移的"策略库"。' },
     { id: 'strategy', name: '苦撑型', description: '遇到困难不退缩，但方法单一。反复读、反复抄、死记硬背。', guidance: '在肯定坚持品质的同时，引入"策略菜单"，让其通过对比体验不同方法的效果。' },
@@ -28,11 +58,26 @@ export const strategyCopingDimension = {
   ],
 };
 
-export const selfNurturingDimension = {
+export const selfNurturingDimension: Dimension = {
   id: 'self-nurturing',
   name: '自我滋养',
   description: '从学习中获得情感满足的方式',
-  axes: ['satisfaction-experience', 'attribution-confirmation'] as [string, string],
+  axes: [
+    {
+      id: 'satisfaction-experience',
+      name: '满足体验',
+      description: '完成任务和克服困难后，能否感到开心和骄傲',
+      positiveLabel: '有成就感',
+      negativeLabel: '情感平淡',
+    },
+    {
+      id: 'attribution-confirmation',
+      name: '成就归因',
+      description: '把好成绩归因于自己的努力方法，还是归因于运气和外部表扬',
+      positiveLabel: '内源确认',
+      negativeLabel: '依赖外部',
+    },
+  ],
   quadrants: [
     { id: 'optimal', name: '自我滋养型', description: '完成挑战后能获得充实的满足感，且主要来自内心确认。', guidance: '保护其内在动机的纯度，避免过度外部奖励侵蚀其内在满足感。' },
     { id: 'strategy', name: '外源满足型', description: '完成后的满足感较强，但主要依赖外部认可。', guidance: '在给予肯定的同时，逐步引导其关注自身感受，建立内在评价标准。' },
