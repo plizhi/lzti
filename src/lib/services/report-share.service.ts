@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/db';
 import { ApiError } from '@/lib/api/response';
 import { getQuestionnaire } from '@/data/questionnaires';
+import { buildSessionComparison } from '@/lib/report/session-comparison';
+import type { SessionComparison } from '@/lib/report/session-comparison';
 import { generateReportShareCode } from './code-generator';
 
 // 创建报告分享
@@ -116,6 +118,23 @@ export async function getSharedReport(shareCode: string) {
 
   const questionnaire = getQuestionnaire(attempt.stageId);
 
+  // 跨视角对比（2026-11-01）
+  //
+  // 零 DDL：现算，不落库、不写迁移。
+  // 对比失败不能拖垮整个分享页 —— 降级成「暂无对比」，报告照常能看。
+  let comparison: SessionComparison;
+  try {
+    comparison = await buildSessionComparison(attempt.sessionId, attempt.stageId);
+  } catch (error) {
+    console.error('[分享报告] 生成跨视角对比失败:', error);
+    comparison = {
+      kind: 'none',
+      completedRoles: [],
+      missingRoles: ['parent', 'student', 'teacher'],
+      note: '跨视角对比暂时无法生成，其余内容不受影响。',
+    };
+  }
+
   return {
     report: {
       attemptId: attempt.id,
@@ -126,6 +145,7 @@ export async function getSharedReport(shareCode: string) {
       questionnaireType: attempt.questionnaireType,
       scores: attempt.scores,
       quadrants: attempt.quadrants,
+      comparison,
       report: attempt.report
         ? {
             id: attempt.report.id,

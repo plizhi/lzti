@@ -3,11 +3,14 @@ import { ApiError } from '@/lib/api/response';
 import { validateStageId, validateQuestionnaireType } from '@/lib/validators';
 import { calculateAllDimensionScores } from '@/lib/scoring/calculator';
 import { determineAllQuadrants } from '@/lib/scoring';
+// 计分配置构建：2026-11-01 从本文件提取到 src/lib/scoring/build-scoring-config.ts，
+// 让跨视角对比模块能复用同一条生产计分路径。签名与行为与提取前逐字一致。
+import { buildScoringConfig } from '@/lib/scoring/build-scoring-config';
 import { getQuestionnaire } from '@/data/questionnaires';
 import { generateSingleReport } from '@/lib/report/generator';
 import { onReferralAssessed } from './referral.service';
 import { checkQuota, deductQuota } from './membership.service';
-import type { Questionnaire, Question, Dimension, ScoringConfig, ScoringAxisConfig } from '@/types/questionnaire';
+import type { Question, Dimension } from '@/types/questionnaire';
 import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
 
@@ -44,49 +47,6 @@ async function createReTestReminder(
       status: 'pending',
     },
   });
-}
-
-function buildScoringConfig(
-  questionnaire: Questionnaire,
-  questions: Question[]
-): ScoringConfig {
-  const axes: ScoringAxisConfig[] = [];
-  const reverseQuestions: string[] = [];
-
-  for (const dimension of questionnaire.dimensions) {
-    const axis1Id = typeof dimension.axes[0] === 'string' ? dimension.axes[0] : dimension.axes[0].id;
-    const axis2Id = typeof dimension.axes[1] === 'string' ? dimension.axes[1] : dimension.axes[1].id;
-
-    const axis1Questions = questions.filter(
-      (q) => q.dimensionId === dimension.id && q.axisId === axis1Id
-    );
-    const axis2Questions = questions.filter(
-      (q) => q.dimensionId === dimension.id && q.axisId === axis2Id
-    );
-
-    if (axis1Questions.length > 0) {
-      axes.push({
-        axisId: axis1Id,
-        questionIds: axis1Questions.map((q) => q.id),
-      });
-      axis1Questions.filter((q) => q.reverse).forEach((q) => reverseQuestions.push(q.id));
-    }
-
-    if (axis2Questions.length > 0) {
-      axes.push({
-        axisId: axis2Id,
-        questionIds: axis2Questions.map((q) => q.id),
-      });
-      axis2Questions.filter((q) => q.reverse).forEach((q) => reverseQuestions.push(q.id));
-    }
-  }
-
-  return {
-    stageId: questionnaire.stageId,
-    questionnaireType: 'parent',
-    axes,
-    reverseQuestions,
-  };
 }
 
 // 获取用户所有孩子的测评历史
