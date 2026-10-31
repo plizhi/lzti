@@ -11,6 +11,7 @@
 //
 // 本测试验证：改成按语义坐标判严重度后，方向是否正确、两种约定下是否都成立。
 import { describe, it, expect } from 'vitest';
+import type { Axis } from '@/types/questionnaire';
 import { questionnaires } from '@/data/questionnaires';
 import { calculateAllDimensionScores, determineQuadrantType } from '@/lib/scoring/calculator';
 import { coordinateOf } from '@/lib/scoring/quadrant-geometry';
@@ -64,7 +65,8 @@ function runScenario(label: string, mode: 'worst' | 'lopsided') {
         if (!firstQ) continue;
         const dim = q.dimensions.find((d) => d.id === firstQ.dimensionId);
         if (!dim) continue;
-        const isAxis1 = dim.axes[0]?.id === ax.axisId;
+        const axisIdOf = (a: Axis | string) => (typeof a === 'string' ? a : a.id);
+        const isAxis1 = dim.axes[0] !== undefined && axisIdOf(dim.axes[0]) === ax.axisId;
         for (const qid of ax.questionIds) {
           const qq = questions.find((x) => x.id === qid);
           if (!qq) continue;

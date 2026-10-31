@@ -7,6 +7,7 @@
 // 做法：直接复刻 generator.ts 的 calculateTrajectory 逻辑（逐行对照源码），
 //       用真实计分器算出象限，再跑风险算法。
 import { describe, it, expect } from 'vitest';
+import type { Axis } from '@/types/questionnaire';
 import { questionnaires } from '@/data/questionnaires';
 import { calculateAllDimensionScores, determineQuadrantType } from '@/lib/scoring/calculator';
 import { coordinateOf } from '@/lib/scoring/quadrant-geometry';
@@ -122,7 +123,8 @@ describe('报告层严重度方向', () => {
         if (!firstQ) continue;
         const dim = q.dimensions.find((d) => d.id === firstQ.dimensionId);
         if (!dim) continue;
-        const isAxis1 = dim.axes[0]?.id === ax.axisId;
+        const axisIdOf = (a: Axis | string) => (typeof a === 'string' ? a : a.id);
+        const isAxis1 = dim.axes[0] !== undefined && axisIdOf(dim.axes[0]) === ax.axisId;
         for (const qid of ax.questionIds) {
           const qq = questions.find((x) => x.id === qid);
           if (!qq) continue;
