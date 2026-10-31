@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { withAuth, apiSuccess } from '@/lib/api/handler';
 import { prisma } from '@/lib/db';
 import { createShareBatch } from '@/lib/services/share.service';
+import { resolveExpiryHours } from '@/lib/services/expiry';
 import { ApiError, apiError } from '@/lib/api/response';
 
 // GET /api/admin/invitation-codes?type=batches|slots|user-codes&page=1&limit=20
@@ -147,7 +148,7 @@ export const POST = withAuth(async (request: NextRequest, context) => {
 
   try {
     const body = await request.json();
-    const { userId, stageId, questionnaireType, slotCount, expiresInDays } = body;
+    const { userId, stageId, questionnaireType, slotCount, expiresInHours, expiresInDays } = body;
 
     if (!userId) {
       return apiError('请提供用户 ID', 400);
@@ -161,12 +162,14 @@ export const POST = withAuth(async (request: NextRequest, context) => {
       return apiError('无效的问卷类型', 400);
     }
 
+    // 有效期统一按【小时】算；默认 48 小时 = 原来的 2 天。
+    // 兼容旧客户端：仍传 expiresInDays 就按天折算（×24）。
     const batch = await createShareBatch(
       userId,
       stageId,
       questionnaireType,
       slotCount || 10,
-      expiresInDays || 2
+      resolveExpiryHours(expiresInHours, expiresInDays, 48)
     );
 
     return apiSuccess({

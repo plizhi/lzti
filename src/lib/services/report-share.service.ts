@@ -7,7 +7,7 @@ import { generateReportShareCode } from './code-generator';
 export async function createReportShare(
   userId: string,
   attemptId: string,
-  expiresInDays: number = 7
+  expiresInHours: number = 24
 ) {
   // 验证 attempt 存在且属于该用户
   const attempt = await prisma.sessionAttempt.findFirst({
@@ -57,8 +57,10 @@ export async function createReportShare(
     };
   }
 
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+  // 演示链路（2026-10-31 朋大大拍板）：所有分享链接一律 24 小时有效。
+  // 之前是「按天」为单位（默认 7 天），演示时报告要能即时失效，
+  // 所以改成按小时计。注意：已存在的分享沿用原来的 expiresAt，不追溯改。
+  const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
 
   const shareCode = await generateReportShareCode();
 

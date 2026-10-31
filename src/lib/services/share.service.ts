@@ -48,11 +48,12 @@ export async function createShareBatch(
   stageId: string,
   questionnaireType: 'register' | 'student' | 'teacher',
   slotCount: number = 10,
-  expiresInDays: number = 2,
+  expiresInHours: number = 24,
   childId?: string
 ) {
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+  // 演示链路（2026-10-31 朋大大拍板）：参与码一律 24 小时有效。
+  // 之前是 2 天。改成按小时计，便于「扫一次码，当天用完即废」。
+  const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
 
   // student/teacher 类型必须绑定 childId
   if ((questionnaireType === 'student' || questionnaireType === 'teacher') && !childId) {
