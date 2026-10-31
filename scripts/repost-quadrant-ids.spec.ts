@@ -24,10 +24,19 @@
  *   3) 内置断言 A1~A6（见下），任何一关不过就不写盘。
  *
  * ── 用法（走 vitest 跑，项目的 TS 路径别名才生效；参数用环境变量传）──
- *   npx vitest run scripts/repost-quadrant-ids.spec.ts                      # DRY-RUN（默认）
- *   REPOST_APPLY=1 npx vitest run scripts/repost-quadrant-ids.spec.ts       # 写盘
+ *   ⚠️ INCLUDE_SCRIPTS=1 不能省！
+ *      vitest.config.ts 的 include 默认只含 src/**，scripts/** 需显式开关。
+ *      漏掉它会直接报 "No test files found, exiting with code 1"（脚本根本不会被加载）。
+ *
+ *   # DRY-RUN（默认，只打印对照表，不写任何文件）
+ *   INCLUDE_SCRIPTS=1 npx vitest run scripts/repost-quadrant-ids.spec.ts
+ *
+ *   # 写盘（改 id 标签）
+ *   REPOST_APPLY=1 INCLUDE_SCRIPTS=1 npx vitest run scripts/repost-quadrant-ids.spec.ts
+ *
+ *   # 只处理指定维度（分批）
  *   REPOST_APPLY=1 REPOST_DIMS=basic-habits,emotional-adaptation \
- *     npx vitest run scripts/repost-quadrant-ids.spec.ts                   # 只处理指定维度
+ *     INCLUDE_SCRIPTS=1 npx vitest run scripts/repost-quadrant-ids.spec.ts
  *
  * ── 安全性 ──────────────────────────────────────────────────────
  *   · 默认 DRY-RUN，必须显式 REPOST_APPLY=1 才写盘
