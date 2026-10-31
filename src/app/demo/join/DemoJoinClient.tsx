@@ -412,8 +412,15 @@ export default function DemoJoinClient() {
           })}
         </div>
 
-        {info.allCompleted && (
-          <ReportList reports={info.reports} copied={copied} onCopy={copyLink} />
+        {info.reports && info.reports.length > 0 && (
+          <>
+            <ReportList reports={info.reports} copied={copied} onCopy={copyLink} />
+            {!info.allCompleted && (
+              <p className="mt-3 text-center text-xs text-stone-400">
+                其余角色完成后，同样这些链接里会自动多出对比内容
+              </p>
+            )}
+          </>
         )}
       </Shell>
     );
@@ -602,12 +609,32 @@ export default function DemoJoinClient() {
           </p>
         </div>
 
-        {result.allCompleted ? (
+        {result.reports && result.reports.length > 0 ? (
           <>
-            <div className="mt-6 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
-              三份都齐了！下面三个链接是只读报告，24 小时内有效，可以转发给家长或老师。
+            <div
+              className={`mt-6 rounded-xl border px-4 py-3 text-sm ${
+                result.allCompleted
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : 'bg-stone-100 border-stone-200 text-stone-600'
+              }`}
+            >
+              {result.allCompleted
+                ? '三份都齐了！下面是三个只读报告链接，24 小时内有效，可以转发给家长或老师。'
+                : '你这一份的报告已经出来了（下面链接，24 小时内有效）。等其余角色完成后，同样这个链接里会自动多出对比内容。'}
             </div>
             <ReportList reports={result.reports} copied={copied} onCopy={copyLink} />
+            {!result.allCompleted && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('choose');
+                  void loadInfo();
+                }}
+                className="mt-3 block text-sm underline"
+              >
+                返回查看进度
+              </button>
+            )}
           </>
         ) : (
           <div className="mt-6 rounded-xl bg-stone-100 px-4 py-3 text-sm text-stone-600">

@@ -376,11 +376,12 @@ export function isAllCompleted(completed: Record<string, boolean>): boolean {
 
 /** 给每个 attempt 生成报告码（只读、24h、可多人查看） */
 async function buildReportLinks(
-  session: JoinSession,
-  completed: Record<string, boolean>
+  session: JoinSession
 ): Promise<DemoJoinReportLink[]> {
-  if (!isAllCompleted(completed)) return [];
-
+  // 不再等三份齐：每完成一份卷，就发该视角的报告码
+  // （2026-11-01 朋大大：「完成一份测试就可以出一份对应的报告」）。
+  // createReportShare 对同一 attempt 是幂等的（已有则直接复用），
+  // 所以落地页反复刷新不会重复发码。
   const attempts = await prisma.sessionAttempt.findMany({
     where: { sessionId: session.id, report: { isNot: null } },
     orderBy: { createdAt: 'asc' },
@@ -547,7 +548,7 @@ export async function getDemoJoinInfo(code: string): Promise<DemoJoinInfo> {
     completed,
     roles: buildRoleViews(session.stageId, completed),
     allCompleted: isAllCompleted(completed),
-    reports: await buildReportLinks(session, completed),
+    reports: await buildReportLinks(session),
   };
 }
 
@@ -747,12 +748,8 @@ export async function submitDemoJoinAnswers(params: {
       submittedAt: now.toISOString(),
       completed: freshCompleted,
       allCompleted,
-      reports: allCompleted
-        ? await buildReportLinks(
-            (fresh as JoinSession | null) ?? session,
-            freshCompleted
-          )
-        : [],
+      // 每完成一份就带该份的报告码，不用等三份齐
+      reports: await buildReportLinks((fresh as JoinSession | null) ?? session),
     };
   } catch (err) {
     // 提交失败 → 把角色槽位还回去，否则这一份卷就白白作废了
