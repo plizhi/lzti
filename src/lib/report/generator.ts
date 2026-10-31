@@ -91,7 +91,10 @@ function calculateTrajectory(
   if (overwhelmedDimensions.length >= 2) riskLevel = 'critical';
   else if (overwhelmedDimensions.length === 1 && total >= 3) riskLevel = 'high';
   else if (overwhelmedDimensions.length === 1 || passiveDimensions.length >= 2) riskLevel = 'high';
-  else if (optimalDimensions.length === total) riskLevel = 'low';
+  // ⚠️ total > 0 的判断不能省：一个维度都没有时 `optimal.length === total` 会成立（0===0）
+  //    → 判成 low → 报告显示「整体状态良好」。
+  //    「什么都没测到」绝不能推出「状态良好」。
+  else if (total > 0 && optimalDimensions.length === total) riskLevel = 'low';
   else if (strategyDimensions.length === total && optimalDimensions.length > 0) riskLevel = 'low';
 
   // 风险组合
@@ -115,7 +118,10 @@ function calculateTrajectory(
 
   // 预测路径
   let predictedPath = '保持当前趋势发展';
-  if (riskLevel === 'critical') {
+  if (total === 0) {
+    // 没有任何有效维度 —— 不给结论，也不说「良好」
+    predictedPath = '本次测评没有有效数据，无法判断孩子的状态';
+  } else if (riskLevel === 'critical') {
     predictedPath = '如不干预，多维度风险可能相互叠加，形成负向循环';
   } else if (riskLevel === 'high') {
     if (overwhelmedDimensions.length > 0) {
@@ -156,12 +162,19 @@ export function generateSingleReport(
 ): SingleReport {
   const { scores, quadrants } = calculateAttemptScores(questionnaire, scoringConfig, answers, questionnaireType);
 
-  const currentStatus: CurrentStatus[] = questionnaire.dimensions.map((dimension) => {
-    const quadrantType = quadrants[dimension.id] as QuadrantType;
+  // 生成当前状态
+  //
+  // ⚠️ 信息不足的维度（该维度没有数据 → 计分器不产生分数）**不产出条目**。
+  //    以前这里用 `dimensionScores?.axis1 ?? 3` 兜底成中性 3 分，
+  //    等于把「没数据」说成「中性」，再被象限判定读成「双差」→ 报告判成最差。
+  const currentStatus: CurrentStatus[] = questionnaire.dimensions.flatMap((dimension) => {
     const dimensionScores = scores[dimension.id];
+    if (!dimensionScores) return [];
+
+    const quadrantType = quadrants[dimension.id] as QuadrantType;
     const quadrant = dimension.quadrants.find((q) => q.id === quadrantType);
 
-    return {
+    return [{
       dimensionId: dimension.id,
       dimensionName: dimension.name,
       quadrantType,
@@ -172,10 +185,10 @@ export function generateSingleReport(
       guidance: quadrant?.guidance,
       parentAction: quadrant?.parentAction,
       scores: {
-        axis1: dimensionScores?.axis1 ?? 3,
-        axis2: dimensionScores?.axis2 ?? 3,
+        axis1: dimensionScores.axis1,
+        axis2: dimensionScores.axis2,
       },
-    };
+    }];
   });
 
   // 生成关注建议
@@ -223,44 +236,52 @@ export function generateParentChildReport(
   const { scores: parentScores, quadrants: parentQuadrants } = calculateAttemptScores(
     questionnaire,
     parentScoringConfig,
-    parentAnswers
+    parentAnswers,
+    'parent'
   );
   const { scores: studentScores, quadrants: studentQuadrants } = calculateAttemptScores(
     questionnaire,
     studentScoringConfig,
-    studentAnswers
+    studentAnswers,
+    'student'
   );
 
   // 构建对比状态
-  const comparisonStatuses: ComparisonStatus[] = questionnaire.dimensions.map((dimension) => {
-    const parentQuadrant = parentQuadrants[dimension.id] as QuadrantType;
-    const studentQuadrant = studentQuadrants[dimension.id] as QuadrantType;
+  //
+  // ⚠️ 双方任一方数据不完整（无分数）的维度**不进入对比**：
+  //    否则 undefined 象限会被判成「认知不一致」，生成
+  //    「家长认为是""，孩子自评为"X"」这种垃圾文案。
+  const comparisonStatuses: ComparisonStatus[] = questionnaire.dimensions.flatMap((dimension) => {
     const parentScore = parentScores[dimension.id];
     const studentScore = studentScores[dimension.id];
+    if (!parentScore || !studentScore) return [];
+
+    const parentQuadrant = parentQuadrants[dimension.id] as QuadrantType;
+    const studentQuadrant = studentQuadrants[dimension.id] as QuadrantType;
 
     const isConsistent = parentQuadrant === studentQuadrant;
 
-    return {
+    return [{
       dimensionId: dimension.id,
       dimensionName: dimension.name,
       parent: {
         quadrantType: parentQuadrant,
         quadrantName: dimension.quadrants.find((q) => q.id === parentQuadrant)?.name ?? '',
         scores: {
-          axis1: parentScore?.axis1 ?? 3,
-          axis2: parentScore?.axis2 ?? 3,
+          axis1: parentScore.axis1,
+          axis2: parentScore.axis2,
         },
       },
       student: {
         quadrantType: studentQuadrant,
         quadrantName: dimension.quadrants.find((q) => q.id === studentQuadrant)?.name ?? '',
         scores: {
-          axis1: studentScore?.axis1 ?? 3,
-          axis2: studentScore?.axis2 ?? 3,
+          axis1: studentScore.axis1,
+          axis2: studentScore.axis2,
         },
       },
       isConsistent,
-    };
+    }];
   });
 
   // 生成对比建议
@@ -283,7 +304,11 @@ export function generateParentChildReport(
     }));
 
   // 生成雷达图数据
-  const radarLabels = questionnaire.dimensions.flatMap((d) =>
+  // 只画双方都有数据的维度 —— 保证 labels 与两边的 data 一一对应（不错位）
+  const radarDimensions = questionnaire.dimensions.filter(
+    (d) => parentScores[d.id] && studentScores[d.id]
+  );
+  const radarLabels = radarDimensions.flatMap((d) =>
     d.axes.map((a) => (typeof a === 'string' ? a : a.name))
   );
 
@@ -291,17 +316,17 @@ export function generateParentChildReport(
     {
       label: '家长',
       color: '#f59e0b', // amber-500
-      data: questionnaire.dimensions.flatMap((d) => {
-        const s = parentScores[d.id];
-        return [s?.axis1 ?? 3, s?.axis2 ?? 3];
+      data: radarDimensions.flatMap((d) => {
+        const s = parentScores[d.id]!;
+        return [s.axis1, s.axis2];
       }),
     },
     {
       label: '孩子',
       color: '#3b82f6', // blue-500
-      data: questionnaire.dimensions.flatMap((d) => {
-        const s = studentScores[d.id];
-        return [s?.axis1 ?? 3, s?.axis2 ?? 3];
+      data: radarDimensions.flatMap((d) => {
+        const s = studentScores[d.id]!;
+        return [s.axis1, s.axis2];
       }),
     },
   ];
@@ -355,56 +380,66 @@ export function generateHomeSchoolReport(
   const { scores: parentScores, quadrants: parentQuadrants } = calculateAttemptScores(
     questionnaire,
     parentScoringConfig,
-    parentAnswers
+    parentAnswers,
+    'parent'
   );
   const { scores: studentScores, quadrants: studentQuadrants } = calculateAttemptScores(
     questionnaire,
     studentScoringConfig,
-    studentAnswers
+    studentAnswers,
+    'student'
   );
   const { scores: teacherScores, quadrants: teacherQuadrants } = calculateAttemptScores(
     questionnaire,
     teacherScoringConfig,
-    teacherAnswers
+    teacherAnswers,
+    'teacher'
   );
 
   // 构建对比状态
-  const comparisonStatuses: ComparisonStatus[] = questionnaire.dimensions.map((dimension) => {
+  //
+  // ⚠️ 三方任一方数据不完整（无分数）的维度**不进入对比**（同亲子对比）
+  const comparisonStatuses: ComparisonStatus[] = questionnaire.dimensions.flatMap((dimension) => {
+    const parentScore = parentScores[dimension.id];
+    const studentScore = studentScores[dimension.id];
+    const teacherScore = teacherScores[dimension.id];
+    if (!parentScore || !studentScore || !teacherScore) return [];
+
     const parentQuadrant = parentQuadrants[dimension.id] as QuadrantType;
     const studentQuadrant = studentQuadrants[dimension.id] as QuadrantType;
     const teacherQuadrant = teacherQuadrants[dimension.id] as QuadrantType;
 
-    return {
+    return [{
       dimensionId: dimension.id,
       dimensionName: dimension.name,
       parent: {
         quadrantType: parentQuadrant,
         quadrantName: dimension.quadrants.find((q) => q.id === parentQuadrant)?.name ?? '',
         scores: {
-          axis1: parentScores[dimension.id]?.axis1 ?? 3,
-          axis2: parentScores[dimension.id]?.axis2 ?? 3,
+          axis1: parentScore.axis1,
+          axis2: parentScore.axis2,
         },
       },
       student: {
         quadrantType: studentQuadrant,
         quadrantName: dimension.quadrants.find((q) => q.id === studentQuadrant)?.name ?? '',
         scores: {
-          axis1: studentScores[dimension.id]?.axis1 ?? 3,
-          axis2: studentScores[dimension.id]?.axis2 ?? 3,
+          axis1: studentScore.axis1,
+          axis2: studentScore.axis2,
         },
       },
       teacher: {
         quadrantType: teacherQuadrant,
         quadrantName: dimension.quadrants.find((q) => q.id === teacherQuadrant)?.name ?? '',
         scores: {
-          axis1: teacherScores[dimension.id]?.axis1 ?? 3,
-          axis2: teacherScores[dimension.id]?.axis2 ?? 3,
+          axis1: teacherScore.axis1,
+          axis2: teacherScore.axis2,
         },
       },
       isConsistent:
         parentQuadrant === studentQuadrant &&
         studentQuadrant === teacherQuadrant,
-    };
+    }];
   });
 
   // 生成对比建议
@@ -447,7 +482,11 @@ export function generateHomeSchoolReport(
     }));
 
   // 生成雷达图数据
-  const radarLabels = questionnaire.dimensions.flatMap((d) =>
+  // 只画三方都有数据的维度 —— 保证 labels 与三份 data 一一对应（不错位）
+  const radarDimensions = questionnaire.dimensions.filter(
+    (d) => parentScores[d.id] && studentScores[d.id] && teacherScores[d.id]
+  );
+  const radarLabels = radarDimensions.flatMap((d) =>
     d.axes.map((a) => (typeof a === 'string' ? a : a.name))
   );
 
@@ -455,26 +494,26 @@ export function generateHomeSchoolReport(
     {
       label: '家长',
       color: '#f59e0b',
-      data: questionnaire.dimensions.flatMap((d) => [
-        parentScores[d.id]?.axis1 ?? 3,
-        parentScores[d.id]?.axis2 ?? 3,
-      ]),
+      data: radarDimensions.flatMap((d) => {
+        const s = parentScores[d.id]!;
+        return [s.axis1, s.axis2];
+      }),
     },
     {
       label: '孩子',
       color: '#3b82f6',
-      data: questionnaire.dimensions.flatMap((d) => [
-        studentScores[d.id]?.axis1 ?? 3,
-        studentScores[d.id]?.axis2 ?? 3,
-      ]),
+      data: radarDimensions.flatMap((d) => {
+        const s = studentScores[d.id]!;
+        return [s.axis1, s.axis2];
+      }),
     },
     {
       label: '老师',
       color: '#10b981',
-      data: questionnaire.dimensions.flatMap((d) => [
-        teacherScores[d.id]?.axis1 ?? 3,
-        teacherScores[d.id]?.axis2 ?? 3,
-      ]),
+      data: radarDimensions.flatMap((d) => {
+        const s = teacherScores[d.id]!;
+        return [s.axis1, s.axis2];
+      }),
     },
   ];
 
