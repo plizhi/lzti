@@ -15,6 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { questionnaires } from '@/data/questionnaires';
 import { determineQuadrantType } from '@/lib/scoring/calculator';
+import { QUADRANT_TRUTH } from '@/lib/scoring/quadrant-truth';
 import type { StageId } from '@/types/stage';
 
 /** 语义坐标：纵轴高/低 + 横轴高/低 */
@@ -39,82 +40,12 @@ const CODE_COORDINATE: Record<string, Semantic> = {
  *   连接支撑型「虽然心情容易受影响，但愿意找人聊聊」  → 纵低 横高 = 差好
  *   高压积压型「既不容易从负面情绪中恢复，又不太找人倾诉」→ 纵低 横低 = 双差
  */
-const TRUTH: Record<string, Record<string, Semantic>> = {
-  // ---- primary-low ----
-  'learning-interest': {
-    optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好',
-  },
-  'basic-habits': {
-    optimal: '高高', strategy: '差好', passive: '双差', overwhelmed: '好差',
-  },
-  'emotional-adaptation': {
-    optimal: '高高', strategy: '差好', passive: '好差', overwhelmed: '双差',
-  },
-  // ---- primary-high ----
-  'self-efficacy': {
-    optimal: '高高', strategy: '差好', passive: '双差', overwhelmed: '好差',
-  },
-  'strategy-coping': {
-    optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好',
-  },
-  'self-nurturing': {
-    optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好',
-  },
-  // ---- middle-school (junior-1) ----
-  'multi-task-management': {
-    optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好',
-  },
-  'goal-planning': {
-    optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好',
-  },
-  'academic-attribution': {
-    // 内容缺格：strategy「自负型思维」与 passive「习得性无助」都描述双低，
-    // 且「纵低横高」一格没有文案 → 需重写文案 + 补探针题，不是 id 排错
-    optimal: '高高', strategy: '双差', passive: '双差', overwhelmed: '好差',
-  },
-  'emotional-resilience': {
-    optimal: '高高', strategy: '双差', passive: '好差', overwhelmed: '差好',
-  },
-  // ---- junior-3 ----
-  'strategy-integration': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  'goal-anchor': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  'feedback-utilization': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  'mental-stability': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  // ---- senior-1 ----
-  'self-cognition': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  'direction-exploration': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  'academic-strategy': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  'support-connection': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  // ---- senior-3 ----
-  'decision-clarity': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  'goal-action': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  'pressure-resilience': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-  'relationship-autonomy': {
-    optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差',
-  },
-};
+const TRUTH: Record<string, Record<string, Semantic>> = Object.fromEntries(
+  Object.entries(QUADRANT_TRUTH).map(([dim, q]) => [
+    dim,
+    Object.fromEntries(Object.entries(q).map(([id, t]) => [id, t.coordinate])),
+  ]),
+) as Record<string, Record<string, Semantic>>;
 
 /**
  * 当前已知错位的维度。
@@ -153,6 +84,44 @@ const EXPECTED_CORRECT = new Set([
 const STAGES: StageId[] = [
   'primary-low', 'primary-high', 'junior-1', 'junior-3', 'senior-1', 'senior-3',
 ];
+
+/**
+ * 内容缺格：真值表里同一坐标出现两次、另有一格缺失 → 无法靠 id 重排解决，
+ * 必须重写文案 + 补探针题（middle-school 学业归因）。
+ */
+const CONTENT_GAP = new Set(['academic-attribution']);
+
+describe('真值表结构不变量', () => {
+  it('每个维度的四格恰好覆盖四个语义坐标各一次（内容缺格会被当场拦下）', () => {
+    for (const [dim, q] of Object.entries(QUADRANT_TRUTH)) {
+      const coords = Object.values(q).map((t) => t.coordinate);
+      const isBij = coords.length === 4 && new Set(coords).size === 4;
+      if (CONTENT_GAP.has(dim)) {
+        expect(isBij, `${dim} 已在 CONTENT_GAP 名单里，但双射已成立 → 请从名单移除`).toBe(false);
+      } else {
+        expect(isBij, `${dim} 的四格未恰好覆盖四个语义坐标（内容缺格？）`).toBe(true);
+      }
+    }
+  });
+
+  it('内容缺格名单与实际一致（防名单漂移）', () => {
+    const notBij = Object.entries(QUADRANT_TRUTH)
+      .filter(([, q]) => {
+        const coords = Object.values(q).map((t) => t.coordinate);
+        return coords.length !== 4 || new Set(coords).size !== 4;
+      })
+      .map(([dim]) => dim);
+    expect(new Set(notBij)).toEqual(CONTENT_GAP);
+  });
+
+  it('每格都有判读依据（非空）', () => {
+    for (const [dim, q] of Object.entries(QUADRANT_TRUTH)) {
+      for (const [id, t] of Object.entries(q)) {
+        expect(t.rationale, `${dim}.${id} 缺判读依据`).toBeTruthy();
+      }
+    }
+  });
+});
 
 describe('象限语义坐标一致性', () => {
   // 真值表必须覆盖全部维度，且不能有遗漏

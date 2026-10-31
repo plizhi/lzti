@@ -26,6 +26,7 @@
 import { describe, it, expect } from 'vitest';
 import { questionnaires } from '@/data/questionnaires';
 import { quadrantNamesByCoordinate } from '@/lib/scoring/quadrant-geometry';
+import { QUADRANT_TRUTH } from '@/lib/scoring/quadrant-truth';
 import type { StageId } from '@/types/stage';
 
 type Semantic = '高高' | '好差' | '差好' | '双差';
@@ -37,33 +38,18 @@ const STAGES: StageId[] = [
 
 /**
  * 各维度 4 个象限文案的真实语义坐标。
- * 与 quadrant-semantics.test.ts 的 TRUTH 表同源（独立抄录，避免测试间耦合）。
+ *
+ * 唯一真源：src/lib/scoring/quadrant-truth.ts
+ * （2026-10-31 由本文件与 quadrant-semantics.test.ts 的两份独立抄录合并而成，
+ *   并为每格补上判读依据。原先两份抄录中有一处字面量脏值 'hhh'，
+ *   只靠运行时补丁掩盖 —— 静态解析必踩，故合并到生产源文件。）
  */
-const TRUTH: Record<string, Record<string, Semantic>> = {
-  'learning-interest':     { optimal:'高高', strategy:'好差', passive:'双差', overwhelmed:'差好' },
-  'basic-habits':          { optimal:'高高', strategy:'差好', passive:'双差', overwhelmed:'好差' },
-  'emotional-adaptation':  { optimal:'高高', strategy:'差好', passive:'好差', overwhelmed:'双差' },
-  'self-efficacy':         { optimal:'高高', strategy:'差好', passive:'双差', overwhelmed:'好差' },
-  'strategy-coping':       { optimal:'高高', strategy:'好差', passive:'双差', overwhelmed:'差好' },
-  'self-nurturing':        { optimal:'高高', strategy:'好差', passive:'双差', overwhelmed:'差好' },
-  'multi-task-management': { optimal:'高高', strategy:'好差', passive:'双差', overwhelmed:'差好' },
-  'goal-planning':         { optimal:'高高', strategy:'好差', passive:'双差', overwhelmed:'差好' },
-  'academic-attribution':  { optimal:'高高', strategy:'双差', passive:'双差', overwhelmed:'好差' },
-  'emotional-resilience':  { optimal:'高高', strategy:'双差', passive:'好差', overwhelmed:'差好' },
-  'strategy-integration':  { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'goal-anchor':           { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'feedback-utilization':  { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'mental-stability':      { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'self-cognition':        { optimal:'hhh', strategy:'好差', passive:'差好', overwhelmed:'双差' } as never,
-  'direction-exploration': { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'academic-strategy':     { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'support-connection':    { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'decision-clarity':      { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'goal-action':           { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'pressure-resilience':   { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-  'relationship-autonomy': { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' },
-};
-TRUTH['self-cognition'] = { optimal:'高高', strategy:'好差', passive:'差好', overwhelmed:'双差' };
+const TRUTH: Record<string, Record<string, Semantic>> = Object.fromEntries(
+  Object.entries(QUADRANT_TRUTH).map(([dim, q]) => [
+    dim,
+    Object.fromEntries(Object.entries(q).map(([id, t]) => [id, t.coordinate])),
+  ]),
+) as Record<string, Record<string, Semantic>>;
 
 /** 数据侧尚未重排、因此象限图文案归位仍错的维度 */
 const PENDING = new Set([
