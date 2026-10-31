@@ -5,9 +5,16 @@
 //     generator.ts:96   overwhelmed >= 2 → riskLevel = critical
 //     generator.ts:187  overwhelmed → priority high；passive → medium
 //     前端配色          overwhelmed → 红色；passive → 灰色
-//   而代码坐标是：optimal=双高, strategy=好差, overwhelmed=差好, passive=双差
+//   而当时的代码坐标是：optimal=双高, strategy=好差, overwhelmed=差好, passive=双差
 //   → 「双低最差」拿到 passive（灰/medium），「一头弱」拿到 overwhelmed（红/critical）
 //   → 严重度方向反了。
+//
+// ⚠️ 2026-11-01 更新（朋大大拍板「约定 Q」后）：
+//   约定已改为 双差=overwhelmed / 差好=passive（见 quadrant-geometry.ts 的 QUADRANT_COORDINATE），
+//   上面那段「当时的代码坐标」是**历史描述**，不是现状 —— 别照着它理解今天的代码。
+//   现状是：id 判严重度与语义坐标判严重度在约定 Q 下**方向一致**
+//   （双差→overwhelmed→critical；差好→passive→high）。
+//   本测试保留两种约定的对照，用于验证「按坐标判严重度」这个修法本身仍然成立。
 //
 // 本测试验证：改成按语义坐标判严重度后，方向是否正确、两种约定下是否都成立。
 import { describe, it, expect } from 'vitest';
