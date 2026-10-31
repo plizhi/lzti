@@ -123,6 +123,21 @@ describe('真值表结构不变量', () => {
   });
 });
 
+describe('真值表与数据侧的文案名一致性', () => {
+  for (const stage of STAGES) {
+    const qn = questionnaires[stage];
+    for (const dim of qn.dimensions) {
+      it(`${qn.name}·${dim.name}`, () => {
+        const truth = QUADRANT_TRUTH[dim.id];
+        expect(truth, `${dim.id} 缺真值表`).toBeTruthy();
+        const dataNames = dim.quadrants.map((q) => q.name).sort();
+        const truthNames = Object.keys(truth).sort();
+        expect(truthNames, `${dim.id} 的真值表文案名与数据侧不一致`).toEqual(dataNames);
+      });
+    }
+  }
+});
+
 describe('象限语义坐标一致性', () => {
   // 真值表必须覆盖全部维度，且不能有遗漏
   it('真值表覆盖全部 22 个维度', () => {
@@ -157,9 +172,9 @@ describe('象限语义坐标一致性', () => {
       for (const quad of dim.quadrants) {
         const codeCoord = CODE_COORDINATE[quad.id];
         expect(codeCoord, `未知象限 id ${quad.id}`).toBeTruthy();
-        if (truth[quad.id] !== codeCoord) {
+        if (truth[quad.name] !== codeCoord) {
           mismatched.push(
-            `${quad.id}(${quad.name}) 文案语义=${truth[quad.id]} 代码坐标=${codeCoord}`,
+            `${quad.id}(${quad.name}) 文案语义=${truth[quad.name]} 代码坐标=${codeCoord}`,
           );
         }
       }

@@ -63,15 +63,30 @@ const PENDING = new Set([
 /** 由真值表反推：某维度每个语义格子「应该」显示哪条文案 */
 function expectedByCoordinate(
   truth: Record<string, Semantic>,
-  nameById: Record<string, string>,
 ): Record<Semantic, string | undefined> {
+  // 真值表按【文案名】索引 → 直接找出描述该坐标的文案名
   const out = {} as Record<Semantic, string | undefined>;
   for (const coord of COORDS) {
-    const id = Object.keys(truth).find((k) => truth[k] === coord);
-    out[coord] = id ? nameById[id] : undefined;
+    out[coord] = Object.keys(truth).find((k) => truth[k] === coord);
   }
   return out;
 }
+
+describe('真值表与数据侧的文案名一致性', () => {
+  for (const stage of STAGES) {
+    const qn = questionnaires[stage];
+    for (const dim of qn.dimensions) {
+      it(`${qn.name}·${dim.name}`, () => {
+        const truth = QUADRANT_TRUTH[dim.id];
+        expect(truth, `${dim.id} 缺真值表`).toBeTruthy();
+        const dataNames = dim.quadrants.map((q) => q.name).sort();
+        const truthNames = Object.keys(truth).sort();
+        // 文案名改了 / 多了 / 少了 → 真值表必须同步更新，否则下面的语义断言会失真
+        expect(truthNames, `${dim.id} 的真值表文案名与数据侧不一致`).toEqual(dataNames);
+      });
+    }
+  }
+});
 
 describe('象限图文案归位（全维度逐格核对）', () => {
   for (const stage of STAGES) {
@@ -81,9 +96,7 @@ describe('象限图文案归位（全维度逐格核对）', () => {
       const check = () => {
         const truth = TRUTH[dim.id];
         expect(truth, `${dim.id} 缺真值表`).toBeTruthy();
-        const nameById: Record<string, string> = {};
-        for (const q of dim.quadrants) nameById[q.id] = q.name;
-        const expected = expectedByCoordinate(truth, nameById);
+        const expected = expectedByCoordinate(truth);
         const actual = quadrantNamesByCoordinate(
           dim.quadrants.map((q) => ({ id: q.id, name: q.name })),
         );
@@ -110,9 +123,7 @@ describe('象限图文案归位（全维度逐格核对）', () => {
       for (const dim of qn.dimensions) {
         if (dim.id === 'academic-attribution') continue; // 内容缺格，另行处理
         const truth = TRUTH[dim.id];
-        const nameById: Record<string, string> = {};
-        for (const q of dim.quadrants) nameById[q.id] = q.name;
-        const expected = expectedByCoordinate(truth, nameById);
+        const expected = expectedByCoordinate(truth);
         const actual = quadrantNamesByCoordinate(
           dim.quadrants.map((q) => ({ id: q.id, name: q.name })),
         );
