@@ -48,7 +48,7 @@ export const QUADRANT_TRUTH: Record<string, Record<string, QuadrantTruth>> = {
   // ---- 学业归因（轴1 努力可控感 / 轴2 归因灵活度）----
   'academic-attribution': {
     '成长型思维': { coordinate: '高高', rationale: '努力可控 + 归因灵活' },
-    '自负型思维': { coordinate: '双差', rationale: '努力不可控 + 归因固化' },
+    '自负型思维': { coordinate: '差好', rationale: '努力不可控（成功归于聪明）+ 归因灵活（失败仍能具体拆解，不一味归咎外部）' },
     '习得性无助': { coordinate: '双差', rationale: '努力不可控 + 归因固化' },
     '焦灼型思维': { coordinate: '好差', rationale: '努力可控 + 归因固化' },
   },

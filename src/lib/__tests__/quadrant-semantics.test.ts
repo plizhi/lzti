@@ -1,33 +1,34 @@
 // 语义回归测试：锁死「象限文案语义坐标 == 该 id 在计分器里的坐标」
 //
-// 背景（2026-10-31）：
-//   计分器 calculator.ts 的象限坐标是固定的：
-//     optimal=纵高横高  strategy=纵高横低  overwhelmed=纵低横高  passive=纵低横低
-//   而各学段问卷的象限文案，是按「双低 = 最差 = overwhelmed」写的直觉语义。
-//   两套约定冲突 → 17 个维度存在 id 与语义坐标错位，报告会给人贴错标签。
+// 历史（2026-10-31 → 2026-11-01）：
+//   计分器的象限 id ↔ 语义坐标映射，与各学段问卷的象限文案语义，两套约定冲突，
+//   22 个维度里有 17 个存在 id 与语义坐标错位，报告会给人贴错标签。
 //
-// 本测试的作用不是「现在就全绿」，而是把真值表固化下来：
-//   - KNOWN_MISMATCH 里列出的维度 → 断言它们当前处于错位状态（防止悄悄变化）
-//   - 不在名单里的维度           → 断言它们当前语义正确（防止新增错位）
-//   - 修好一个维度后，从 KNOWN_MISMATCH 移除它 → 测试会要求它必须正确
+// 2026-11-01 朋大大拍板【约定 Q】：
+//   双差（纵低横低）= overwhelmed → 红 / critical / 需主动关注
+//   差好（纵低横高）= passive      → 灰 / medium  / 需引导
+//   理由：双差是「内在资源与外在表现都低于中性」，最该主动关注；
+//         差好是「有表现、缺内在驱动」，该引导而非急救。
+//   约定已落地：quadrant-geometry.ts 的 QUADRANT_COORDINATE + 数据侧 id 重贴。
 //
-// 这样任何维度改文案、改 id、改坐标，都会被这个测试立刻抓住。
+// 本测试的作用：把「文案语义坐标 == id 坐标」这条不变量钉死。
+//   任何维度改文案、改 id、改坐标、改真值表，都会被这个测试立刻抓住。
 import { describe, it, expect } from 'vitest';
 import { questionnaires } from '@/data/questionnaires';
 import { determineQuadrantType } from '@/lib/scoring/calculator';
 import { QUADRANT_TRUTH } from '@/lib/scoring/quadrant-truth';
+import { QUADRANT_COORDINATE } from '@/lib/scoring/quadrant-geometry';
 import type { StageId } from '@/types/stage';
 
 /** 语义坐标：纵轴高/低 + 横轴高/低 */
 type Semantic = '高高' | '好差' | '差好' | '双差';
 
-/** 计分器给出的坐标（calculator.ts:167-170） */
-const CODE_COORDINATE: Record<string, Semantic> = {
-  optimal: '高高',
-  strategy: '好差',
-  overwhelmed: '差好',
-  passive: '双差',
-};
+/**
+ * 计分器给出的坐标 —— 直接取唯一真源 quadrant-geometry.ts，
+ * 不在测试里另写一份（约定改了只改一处）。
+ * 另有一组硬断言（见文末「计分器坐标约定本身」）锁住约定不被悄悄改。
+ */
+const CODE_COORDINATE = QUADRANT_COORDINATE as Record<string, Semantic>;
 
 /**
  * 各维度 4 个象限文案的真实语义坐标。
@@ -48,14 +49,22 @@ const TRUTH: Record<string, Record<string, Semantic>> = Object.fromEntries(
 ) as Record<string, Record<string, Semantic>>;
 
 /**
- * 当前已知错位的维度。
- * 修好一个 → 从这里移除，测试会转为要求它必须正确。
- * 判定规则：任一象限的「文案语义坐标」≠「该 id 在计分器里的坐标」即为错位。
+ * 已知错位维度：2026-11-01 约定 Q 落地后已全部清零（空集）。
+ * 若将来又出现错位，把维度加回这里，测试会转为要求「它必须处于错位状态」——
+ * 也就是说，加进来是显式承认「这里还没修」，不修就别加。
  */
-const KNOWN_MISMATCH = new Set([
+const KNOWN_MISMATCH = new Set<string>([]);
+
+/** 应当已经正确的维度（约定 Q 落地后 = 全部 22 个） */
+const EXPECTED_CORRECT = new Set([
+  'learning-interest',
   'basic-habits',
   'emotional-adaptation',
   'self-efficacy',
+  'strategy-coping',
+  'self-nurturing',
+  'multi-task-management',
+  'goal-planning',
   'academic-attribution',
   'emotional-resilience',
   'strategy-integration',
@@ -72,24 +81,18 @@ const KNOWN_MISMATCH = new Set([
   'relationship-autonomy',
 ]);
 
-/** 应当已经正确的维度 */
-const EXPECTED_CORRECT = new Set([
-  'learning-interest',
-  'strategy-coping',
-  'self-nurturing',
-  'multi-task-management',
-  'goal-planning',
-]);
-
 const STAGES: StageId[] = [
   'primary-low', 'primary-high', 'junior-1', 'junior-3', 'senior-1', 'senior-3',
 ];
 
 /**
  * 内容缺格：真值表里同一坐标出现两次、另有一格缺失 → 无法靠 id 重排解决，
- * 必须重写文案 + 补探针题（middle-school 学业归因）。
+ * 必须重写文案（middle-school 学业归因）。
+ *
+ * 2026-11-01：已通过改写「自负型思维」文案解决
+ *   （改为明确的「努力不可控 + 归因灵活」= 差好），双射成立 → 名单清空。
  */
-const CONTENT_GAP = new Set(['academic-attribution']);
+const CONTENT_GAP = new Set<string>([]);
 
 describe('真值表结构不变量', () => {
   it('每个维度的四格恰好覆盖四个语义坐标各一次（内容缺格会被当场拦下）', () => {
@@ -197,14 +200,15 @@ describe('象限语义坐标一致性', () => {
 
 describe('计分器坐标约定本身', () => {
   it('坐标表与 calculator.ts 的实现一致（防止有人改了计分器但没更新这里）', () => {
-    expect(determineQuadrantType(5, 5)).toBe('optimal');   // 高高
-    expect(determineQuadrantType(5, 1)).toBe('strategy');   // 好差
-    expect(determineQuadrantType(1, 5)).toBe('overwhelmed'); // 差好
-    expect(determineQuadrantType(1, 1)).toBe('passive');      // 双差
+    // 约定 Q：双差 = overwhelmed（红 / critical），差好 = passive（灰 / medium）
+    expect(determineQuadrantType(5, 5)).toBe('optimal');     // 高高
+    expect(determineQuadrantType(5, 1)).toBe('strategy');     // 好差
+    expect(determineQuadrantType(1, 5)).toBe('passive');      // 差好
+    expect(determineQuadrantType(1, 1)).toBe('overwhelmed');  // 双差 = 最差
   });
 
   it('阈值语义：3 分算低（>3 才算高）', () => {
-    expect(determineQuadrantType(3, 3)).toBe('passive');
+    expect(determineQuadrantType(3, 3)).toBe('overwhelmed');
     expect(determineQuadrantType(3.01, 3.01)).toBe('optimal');
   });
 });

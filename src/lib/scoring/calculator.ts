@@ -178,11 +178,11 @@ export function determineQuadrantType(
 ): 'optimal' | 'strategy' | 'passive' | 'overwhelmed' {
   // 象限 id 与语义坐标的对应关系见 quadrant-geometry.ts（全项目唯一真源）。
   //
-  // 坐标约定：
+  // 约定 Q（2026-11-01 朋大大拍板）：
   //   纵高横高 = optimal      纵高横低 = strategy
-  //   纵低横高 = overwhelmed  纵低横低 = passive
+  //   纵低横高 = passive      纵低横低 = overwhelmed（最差 → 红 / critical）
   //
-  // ⚠️ 数据侧有 16/22 个维度是按「双低 = 最差 = overwhelmed」写的，与此约定冲突。
-  //    详见 docs/象限语义真值表.md；待约定拍板后，只需改 quadrant-geometry.ts 一处。
+  // 数据侧已按同一约定重贴（见 src/lib/scoring/quadrant-truth.ts 与
+  // src/lib/__tests__/quadrant-semantics.test.ts，两者不一致会被测试当场抓住）。
   return quadrantIdAt(coordinateOf(axis1Score, axis2Score, threshold));
 }

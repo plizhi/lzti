@@ -47,7 +47,7 @@ const learningInterestDimension: Dimension = {
       parentAction: '不是打压他的好奇心，而是帮他完成"从开始到结束"的闭环。把任务拆小，"今天只做这一页，做完就是胜利"。不要在他兴趣转移时批评"又三分钟热度"，而是在他坚持完成时重点肯定"你刚才一直做到了最后"。浅尝辄止型和被动游离型的关键区别：前者有兴趣但缺乏坚持力，干预重点是降低任务难度、强化完成体验。',
     },
     {
-      id: 'passive',
+      id: 'overwhelmed',
       name: '被动游离型',
       description: '学习像完成任务，缺乏内在动力',
       guidance: '不急着培养兴趣，先从"能做到"开始。找一个他已经能做好的事情，让他感受"我也可以做得不错"，再把这个信心慢慢迁移到学习中。同时从他已有的兴趣（哪怕是游戏、手工）中找到和学习内容的连接点。',
@@ -56,7 +56,7 @@ const learningInterestDimension: Dimension = {
       parentAction: '不急着培养兴趣，先从"能做到"开始。找一个他已经能做好的事情（不限于学习），让他感受"我也可以做得不错"，再把这个信心慢慢迁移到学习中。同时从他已有的兴趣（哪怕是游戏、手工）中找到和学习内容的连接点。',
     },
     {
-      id: 'overwhelmed',
+      id: 'passive',
       name: '尽责完成型',
       description: '不觉得有趣但能认真完成，可靠的执行者',
       guidance: '肯定他"认真完成"的品质，不因为他"不兴奋"就觉得他不够好。可以轻轻推一步："你完成了，有没有想过还有没有别的做法？"不要求他一定有兴趣，但可以让他偶尔体验到"换个思路也很有意思"。',
@@ -98,7 +98,7 @@ const basicHabitsDimension: Dimension = {
       parentAction: '增加任务复杂度和自主决策空间，从"执行习惯"向"管理任务"过渡。',
     },
     {
-      id: 'strategy',
+      id: 'passive',
       name: '需提醒但有序型',
       description: '需要外部提醒启动，但一旦开始便能高质量完成',
       guidance: '用提前约定代替临时提醒，逐步将启动责任交还给孩子。',
@@ -107,7 +107,7 @@ const basicHabitsDimension: Dimension = {
       parentAction: '用提前约定代替临时提醒，逐步将启动责任交还给孩子。',
     },
     {
-      id: 'passive',
+      id: 'overwhelmed',
       name: '督促依赖型',
       description: '学习行为依赖外部持续推动，执行质量较低',
       guidance: '降低期待，一次聚焦一个行为目标，区分"不愿意"和"能力不足"。',
@@ -116,7 +116,7 @@ const basicHabitsDimension: Dimension = {
       parentAction: '降低期待，一次聚焦一个行为目标，区分"不愿意"和"能力不足"。',
     },
     {
-      id: 'overwhelmed',
+      id: 'strategy',
       name: '假性自动化型',
       description: '能主动启动，但执行过程草率、马虎',
       guidance: '建立"完成标准"，引入自查环节，培养对质量的自我监控。',
@@ -158,7 +158,7 @@ const emotionalAdaptationDimension: Dimension = {
       parentAction: '保护直接表达的意愿，逐步引导表达方式的合宜性。',
     },
     {
-      id: 'strategy',
+      id: 'passive',
       name: '外显积压型',
       description: '情绪困扰持久，但不隐藏，反复诉说或寻求安慰',
       guidance: '建立"翻篇"能力，通过情绪外化仪式帮其释放积压。',
@@ -167,7 +167,7 @@ const emotionalAdaptationDimension: Dimension = {
       parentAction: '建立"翻篇"能力，通过情绪外化仪式帮其释放积压。',
     },
     {
-      id: 'passive',
+      id: 'strategy',
       name: '内敛稳定型',
       description: '情绪反应不明显，不主动表达内心感受，但学习不受影响',
       guidance: '区分"天性平稳"还是"有感受但缺乏表达渠道"，定期创设轻松沟通时间。',

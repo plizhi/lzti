@@ -24,9 +24,9 @@ export const selfEfficacyDimension: Dimension = {
   ],
   quadrants: [
     { id: 'optimal', name: '成长掌控型', description: '相信能力可成长，也相信努力有用。面对挑战主动投入。', guidance: '持续强化"努力+策略"的归因模式，在成功时引导其看到具体是哪个方法起了作用。' },
-    { id: 'strategy', name: '勤能补拙型', description: '认为能力相对固定，但相信努力可以弥补。愿意下功夫。', guidance: '肯定勤奋品质，同时引导其发现努力之外策略的价值，逐步松动"只能靠拼命"的信念。' },
-    { id: 'passive', name: '习得性无助型', description: '既认为能力固定，也不相信努力有用。最容易放弃努力。', guidance: '制造"被清晰归因为个人努力和策略"的小成功体验，任务要小到绝对能完成。' },
-    { id: 'overwhelmed', name: '潜在自信型', description: '相信能力可成长，但对自身努力的效果存疑。', guidance: '帮助其发现自身已有的成功经验，建立"我也有进步过"的证据。' },
+    { id: 'passive', name: '勤能补拙型', description: '认为能力相对固定，但相信努力可以弥补。愿意下功夫。', guidance: '肯定勤奋品质，同时引导其发现努力之外策略的价值，逐步松动"只能靠拼命"的信念。' },
+    { id: 'overwhelmed', name: '习得性无助型', description: '既认为能力固定，也不相信努力有用。最容易放弃努力。', guidance: '制造"被清晰归因为个人努力和策略"的小成功体验，任务要小到绝对能完成。' },
+    { id: 'strategy', name: '潜在自信型', description: '相信能力可成长，但对自身努力的效果存疑。', guidance: '帮助其发现自身已有的成功经验，建立"我也有进步过"的证据。' },
   ],
 };
 
@@ -53,8 +53,8 @@ export const strategyCopingDimension: Dimension = {
   quadrants: [
     { id: 'optimal', name: '灵活应对型', description: '遇到困难主动想办法，且方法多样，会根据情况调整策略。', guidance: '帮助其总结和命名自己的策略，形成可迁移的"策略库"。' },
     { id: 'strategy', name: '苦撑型', description: '遇到困难不退缩，但方法单一。反复读、反复抄、死记硬背。', guidance: '在肯定坚持品质的同时，引入"策略菜单"，让其通过对比体验不同方法的效果。' },
-    { id: 'passive', name: '退缩等待型', description: '遇到困难既不主动想办法，也缺乏有效方法。倾向于等待或放弃。', guidance: '从"愿意尝试"开始培养，先肯定其任何微小的主动行为，逐步引入简单的策略示范。' },
-    { id: 'overwhelmed', name: '策略意识型', description: '知道遇到困难应该想办法，但实践中主动应对的行动力不足。', guidance: '在真实任务中搭建"从知道到做到"的桥梁，帮其将策略认知转化为行动。' },
+    { id: 'overwhelmed', name: '退缩等待型', description: '遇到困难既不主动想办法，也缺乏有效方法。倾向于等待或放弃。', guidance: '从"愿意尝试"开始培养，先肯定其任何微小的主动行为，逐步引入简单的策略示范。' },
+    { id: 'passive', name: '策略意识型', description: '知道遇到困难应该想办法，但实践中主动应对的行动力不足。', guidance: '在真实任务中搭建"从知道到做到"的桥梁，帮其将策略认知转化为行动。' },
   ],
 };
 
@@ -81,8 +81,8 @@ export const selfNurturingDimension: Dimension = {
   quadrants: [
     { id: 'optimal', name: '自我滋养型', description: '完成挑战后能获得充实的满足感，且主要来自内心确认。', guidance: '保护其内在动机的纯度，避免过度外部奖励侵蚀其内在满足感。' },
     { id: 'strategy', name: '外源满足型', description: '完成后的满足感较强，但主要依赖外部认可。', guidance: '在给予肯定的同时，逐步引导其关注自身感受，建立内在评价标准。' },
-    { id: 'passive', name: '情感淡漠型', description: '完成任务后情感体验平淡，学习变成纯粹的任务完成。', guidance: '帮其重新连接学习与情感体验，从其有兴趣的领域切入，创造完整的学习体验。' },
-    { id: 'overwhelmed', name: '内源确认型', description: '内心知道自己做到了，但情感层面的满足感不强烈。', guidance: '帮其将认知层面的确认与情感层面的满足连接起来，关注和放大微小的积极情感体验。' },
+    { id: 'overwhelmed', name: '情感淡漠型', description: '完成任务后情感体验平淡，学习变成纯粹的任务完成。', guidance: '帮其重新连接学习与情感体验，从其有兴趣的领域切入，创造完整的学习体验。' },
+    { id: 'passive', name: '内源确认型', description: '内心知道自己做到了，但情感层面的满足感不强烈。', guidance: '帮其将认知层面的确认与情感层面的满足连接起来，关注和放大微小的积极情感体验。' },
   ],
 };
 
