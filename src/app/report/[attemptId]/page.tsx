@@ -7,6 +7,8 @@ import { assessment } from '@/lib/api/client';
 import { ShareReportModal } from '@/components/report/ShareReportModal';
 import { ReportUpgradePrompt } from '@/components/report/ReportUpgradePrompt';
 import { TrendChart } from '@/components/report/TrendChart';
+import { DimensionVisualization } from '@/components/report/DimensionVisualization';
+import type { DimensionMeta } from '@/components/report/DimensionVisualization';
 import type { TrendType } from '@/types/report';
 import './print.css';
 
@@ -49,6 +51,7 @@ interface ReportData {
   questionnaireType: string;
   scores: Record<string, { axis1: number; axis2: number }>;
   quadrants: Record<string, string>;
+  dimensionMeta?: DimensionMeta[];
   report: {
     id: string;
     currentStatus: CurrentStatusItem[];
@@ -128,7 +131,7 @@ export default function ReportPage() {
     );
   }
 
-  const { child, stageName, questionnaireType, quadrants, report } = data;
+  const { child, stageName, questionnaireType, quadrants, report, scores, dimensionMeta } = data;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-12">
@@ -196,6 +199,15 @@ export default function ReportPage() {
             ))}
           </div>
         </div>
+
+        {/* 能力画像 + 象限定位 */}
+        {dimensionMeta && dimensionMeta.length > 0 && (
+          <DimensionVisualization
+            dimensionMeta={dimensionMeta}
+            scores={scores ?? {}}
+            quadrants={quadrants ?? {}}
+          />
+        )}
 
         {/* 变化趋势 */}
         {report?.trendAnalysis && (

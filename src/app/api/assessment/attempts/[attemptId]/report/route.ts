@@ -28,6 +28,33 @@ export const GET = withAuth(async (request, context) => {
 
   const questionnaire = getQuestionnaire(attempt.stageId);
 
+  // 维度元信息：轴名/正负标签 + 四个象限的文案。
+  // 前端报告页用它绘制象限图与雷达图（此前这些信息没透出，导致
+  // 写好的 QuadrantChart / RadarChart 组件无法接入）。
+  const dimensionMeta = (questionnaire?.dimensions ?? []).map((dim) => {
+    const axes = dim.axes.map((a) =>
+      typeof a === 'string'
+        ? { id: a, name: a, description: '', positiveLabel: '', negativeLabel: '' }
+        : {
+            id: a.id,
+            name: a.name,
+            description: a.description ?? '',
+            positiveLabel: a.positiveLabel ?? '',
+            negativeLabel: a.negativeLabel ?? '',
+          },
+    );
+    return {
+      dimensionId: dim.id,
+      dimensionName: dim.name,
+      axes,
+      quadrants: dim.quadrants.map((q) => ({
+        id: q.id,
+        name: q.name,
+        description: q.description ?? '',
+      })),
+    };
+  });
+
   return apiSuccess({
     attemptId: attempt.id,
     sessionId: attempt.sessionId,
@@ -37,6 +64,7 @@ export const GET = withAuth(async (request, context) => {
     questionnaireType: attempt.questionnaireType,
     scores: attempt.scores,
     quadrants: attempt.quadrants,
+    dimensionMeta,
     report: attempt.report
       ? {
           id: attempt.report.id,

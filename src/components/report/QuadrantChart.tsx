@@ -1,6 +1,8 @@
 'use client';
 
 import type { QuadrantType } from '@/lib/scoring/quadrant';
+import { QUADRANT_COLOR } from '@/lib/scoring/quadrant-geometry';
+import type { SemanticCoordinate } from '@/lib/scoring/quadrant-geometry';
 
 interface QuadrantChartProps {
   axis1Label: string; // 纵轴标签
@@ -9,23 +11,26 @@ interface QuadrantChartProps {
   axis1LowLabel: string; // 纵轴负向标签
   axis2HighLabel: string; // 横轴正向标签
   axis2LowLabel: string; // 横轴负向标签
-  quadrantPositions: {
-    topLeft: string;
-    topRight: string;
-    bottomLeft: string;
-    bottomRight: string;
-  };
-  currentQuadrant: QuadrantType | null;
+  /**
+   * 四个语义坐标各自对应的象限名。
+   * key 是语义坐标（高高/好差/差好/双差），不是象限 id ——
+   * 这样象限约定怎么调整，格子代表的语义位置永远正确。
+   */
+  quadrantNames: Record<SemanticCoordinate, string>;
+  /** 当前所在语义坐标（由分数算出） */
+  currentCoordinate: SemanticCoordinate | null;
   axis1Score: number; // 原始均分 1-5
   axis2Score: number; // 原始均分 1-5
 }
 
-const quadrantColors: Record<QuadrantType, string> = {
-  optimal: 'bg-green-100 border-green-300 text-green-800',
-  strategy: 'bg-amber-100 border-amber-300 text-amber-800',
-  passive: 'bg-stone-100 border-stone-300 text-stone-600',
-  overwhelmed: 'bg-red-100 border-red-300 text-red-800',
-};
+const GRID_POSITIONS = {
+  topRight: { cls: 'border-r border-b', dot: 'bg-green-500', text: 'text-green-700', ring: 'ring-green-400', bg: 'bg-green-100' },
+  topLeft: { cls: 'border-l border-b', dot: 'bg-red-500', text: 'text-red-700', ring: 'ring-red-400', bg: 'bg-red-100' },
+  bottomLeft: { cls: 'border-t border-r', dot: 'bg-stone-500', text: 'text-stone-700', ring: 'ring-stone-500', bg: 'bg-stone-300' },
+  bottomRight: { cls: 'border-t border-l', dot: 'bg-amber-500', text: 'text-amber-700', ring: 'ring-amber-400', bg: 'bg-amber-100' },
+} as const;
+
+type GridPosition = keyof typeof GRID_POSITIONS;
 
 export function QuadrantChart({
   axis1Label,
@@ -34,26 +39,54 @@ export function QuadrantChart({
   axis1LowLabel,
   axis2HighLabel,
   axis2LowLabel,
-  quadrantPositions,
-  currentQuadrant,
+  quadrantNames,
+  currentCoordinate,
   axis1Score,
   axis2Score,
 }: QuadrantChartProps) {
-  // 确定当前象限位置
+  // 分数 → 语义坐标（阈值 >3 为高，与计分器一致）
   const isAxis1High = axis1Score > 3;
   const isAxis2High = axis2Score > 3;
 
-  let currentPosition: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
-  if (isAxis1High && isAxis2High) currentPosition = 'topRight';
-  else if (!isAxis1High && isAxis2High) currentPosition = 'topLeft';
-  else if (!isAxis1High && !isAxis2High) currentPosition = 'bottomLeft';
-  else currentPosition = 'bottomRight';
+  let currentPosition: GridPosition | null = null;
+  if (currentCoordinate) {
+    if (currentCoordinate === '高高') currentPosition = 'topRight';
+    else if (currentCoordinate === '差好') currentPosition = 'topLeft';
+    else if (currentCoordinate === '双差') currentPosition = 'bottomLeft';
+    else currentPosition = 'bottomRight';
+  }
 
-  const quadrantBgColors = {
-    topRight: currentPosition === 'topRight' ? 'bg-green-100' : 'bg-stone-50',
-    topLeft: currentPosition === 'topLeft' ? 'bg-red-100' : 'bg-stone-50',
-    bottomLeft: currentPosition === 'bottomLeft' ? 'bg-stone-200' : 'bg-stone-50',
-    bottomRight: currentPosition === 'bottomRight' ? 'bg-amber-100' : 'bg-stone-50',
+  // 每个格子显示哪个语义坐标的文案
+  const positionCoordinate: Record<GridPosition, SemanticCoordinate> = {
+    topRight: '高高',
+    topLeft: '差好',
+    bottomLeft: '双差',
+    bottomRight: '好差',
+  };
+
+  const renderCell = (pos: GridPosition) => {
+    const s = GRID_POSITIONS[pos];
+    const isCurrent = currentPosition === pos;
+    const coord = positionCoordinate[pos];
+    return (
+      <div
+        key={pos}
+        className={`relative p-2 flex items-center justify-center ${s.cls} border-stone-200 ${
+          isCurrent ? `${s.bg} ring-2 ${s.ring}` : 'bg-stone-50'
+        }`}
+      >
+        <div className="text-center">
+          <div className={`text-xs font-medium ${isCurrent ? s.text : 'text-stone-500'}`}>
+            {quadrantNames[coord]}
+          </div>
+          {isCurrent && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-3 h-3 ${s.dot} rounded-full animate-pulse`} />
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -62,6 +95,7 @@ export function QuadrantChart({
       <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full mr-2 text-right">
         <div className="text-xs text-stone-500">{axis1Label}</div>
         <div className="text-xs text-stone-400">{axis1HighLabel} ↑</div>
+        <div className="text-xs text-stone-400">↓ {axis1LowLabel}</div>
       </div>
 
       {/* 图表区域 */}
@@ -73,61 +107,10 @@ export function QuadrantChart({
 
         {/* 四个象限 */}
         <div className="absolute inset-0 grid grid-cols-2 grid-rows-2">
-          {/* 右上 - Optimal */}
-          <div className={`relative p-2 flex items-center justify-center border-r border-b border-stone-200 ${currentPosition === 'topRight' ? 'bg-green-100 ring-2 ring-green-400' : 'bg-stone-50'}`}>
-            <div className="text-center">
-              <div className={`text-xs font-medium ${currentPosition === 'topRight' ? 'text-green-700' : 'text-stone-500'}`}>
-                {quadrantPositions.topRight}
-              </div>
-              {currentPosition === 'topRight' && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 左上 - Overwhelmed */}
-          <div className={`relative p-2 flex items-center justify-center border-l border-b border-stone-200 ${currentPosition === 'topLeft' ? 'bg-red-100 ring-2 ring-red-400' : 'bg-stone-50'}`}>
-            <div className="text-center">
-              <div className={`text-xs font-medium ${currentPosition === 'topLeft' ? 'text-red-700' : 'text-stone-500'}`}>
-                {quadrantPositions.topLeft}
-              </div>
-              {currentPosition === 'topLeft' && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 左下 - Passive */}
-          <div className={`relative p-2 flex items-center justify-center border-t border-r border-stone-200 ${currentPosition === 'bottomLeft' ? 'bg-stone-300 ring-2 ring-stone-500' : 'bg-stone-50'}`}>
-            <div className="text-center">
-              <div className={`text-xs font-medium ${currentPosition === 'bottomLeft' ? 'text-stone-700' : 'text-stone-500'}`}>
-                {quadrantPositions.bottomLeft}
-              </div>
-              {currentPosition === 'bottomLeft' && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-3 h-3 bg-stone-500 rounded-full animate-pulse" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 右下 - Strategy */}
-          <div className={`relative p-2 flex items-center justify-center border-t border-l border-stone-200 ${currentPosition === 'bottomRight' ? 'bg-amber-100 ring-2 ring-amber-400' : 'bg-stone-50'}`}>
-            <div className="text-center">
-              <div className={`text-xs font-medium ${currentPosition === 'bottomRight' ? 'text-amber-700' : 'text-stone-500'}`}>
-                {quadrantPositions.bottomRight}
-              </div>
-              {currentPosition === 'bottomRight' && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse" />
-                </div>
-              )}
-            </div>
-          </div>
+          {renderCell('topRight')}
+          {renderCell('topLeft')}
+          {renderCell('bottomLeft')}
+          {renderCell('bottomRight')}
         </div>
 
         {/* 得分标注 */}
@@ -153,10 +136,12 @@ interface QuadrantBadgeProps {
 }
 
 export function QuadrantBadge({ quadrantType, quadrantName }: QuadrantBadgeProps) {
-  const colorClasses = quadrantColors[quadrantType];
-
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorClasses}`}>
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+        QUADRANT_COLOR[quadrantType]
+      }`}
+    >
       {quadrantName}
     </span>
   );

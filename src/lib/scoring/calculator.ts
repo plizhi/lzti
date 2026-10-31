@@ -8,6 +8,7 @@
 
 import type { Question, ScoringConfig } from '@/types/questionnaire';
 import type { DimensionAnswers, DimensionScores } from '@/types/assessment';
+import { coordinateOf, quadrantIdAt } from './quadrant-geometry';
 
 /**
  * 将反向题得分转换为正向得分
@@ -153,19 +154,13 @@ export function determineQuadrantType(
   axis2Score: number,
   threshold: number = 3
 ): 'optimal' | 'strategy' | 'passive' | 'overwhelmed' {
-  const axis1High = axis1Score > threshold;
-  const axis2High = axis2Score > threshold;
-
-  // 四象限排列：
-  // 纵轴(好奇探索/自动化/情绪占据度)为Y轴，正向在上
-  // 横轴(坚持完成/执行有序/情绪表达)为X轴，正向在右
+  // 象限 id 与语义坐标的对应关系见 quadrant-geometry.ts（全项目唯一真源）。
   //
-  //           | axis2高（横轴正向）| axis2低（横轴负向）
-  // axis1高   |   optimal(右上)    |   strategy(左上)
-  // axis1低   |   overwhelmed(右下)|   passive(左下)
-
-  if (axis1High && axis2High) return 'optimal';
-  if (!axis1High && axis2High) return 'overwhelmed';
-  if (!axis1High && !axis2High) return 'passive';
-  return 'strategy';
+  // 坐标约定：
+  //   纵高横高 = optimal      纵高横低 = strategy
+  //   纵低横高 = overwhelmed  纵低横低 = passive
+  //
+  // ⚠️ 数据侧有 16/22 个维度是按「双低 = 最差 = overwhelmed」写的，与此约定冲突。
+  //    详见 docs/象限语义真值表.md；待约定拍板后，只需改 quadrant-geometry.ts 一处。
+  return quadrantIdAt(coordinateOf(axis1Score, axis2Score, threshold));
 }
