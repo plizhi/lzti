@@ -46,3 +46,9 @@ next-env.d.ts
 # AI 会话导出（openclaw / claude code 的 session export，纯垃圾）
 pi-session-*.html
 *-session-*.html
+
+# 本地编辑器/助手配置
+.claude/
+# 本地配置备份副本（含密钥，禁止入库）
+*.bak*
+.env.local.bak*
