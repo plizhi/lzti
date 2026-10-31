@@ -1,16 +1,18 @@
-// 验证第三段文档的核心断言：报告层的严重度方向是否真的反了
+// 验证报告层的严重度方向是否与语义坐标一致
 //
-// 断言：
-//   场景 A：孩子两轴都偏弱（双低，最差）→ 全部落 passive → riskLevel = high
-//   场景 B：孩子一头弱一头强（纵低横高，偏科）→ 全部落 overwhelmed → riskLevel = critical
+// 约定 Q（2026-11-01 朋大大拍板，见 src/lib/scoring/quadrant-geometry.ts）：
+//   双差（纵低横低，最差）→ overwhelmed → riskLevel = critical（需主动关注）
+//   差好（纵低横高，偏科）→ passive      → riskLevel = high（需引导）
 //
 // 做法：直接复刻 generator.ts 的 calculateTrajectory 逻辑（逐行对照源码），
 //       用真实计分器算出象限，再跑风险算法。
+// ⚠️ 本文件不要再硬编码「象限编号 ↔ 语义坐标」的对照表 —— 那份副本就是
+//    「过期真相」：约定一变它会绿着骗人。统一读生产真值表 QUADRANT_COORDINATE。
 import { describe, it, expect } from 'vitest';
 import type { Axis } from '@/types/questionnaire';
 import { questionnaires } from '@/data/questionnaires';
 import { calculateAllDimensionScores, determineQuadrantType } from '@/lib/scoring/calculator';
-import { coordinateOf } from '@/lib/scoring/quadrant-geometry';
+import { coordinateOf, QUADRANT_COORDINATE } from '@/lib/scoring/quadrant-geometry';
 import { primaryLowStudentScoring } from '@/data/questionnaires/primary-low/scoring';
 import { primaryHighStudentScoring } from '@/data/questionnaires/primary-high/scoring';
 import { middleSchoolStudentScoring } from '@/data/questionnaires/middle-school/scoring';
@@ -74,7 +76,7 @@ function buildAnswersFor(stage: string, axis1Raw: number, axis2Raw: number) {
 }
 
 describe('报告层严重度方向', () => {
-  it('场景 A：双低（两轴都最差）→ 落 passive → riskLevel', () => {
+  it('场景 A：双低（两轴都最差）→ 落 overwhelmed → riskLevel', () => {
     const out: string[] = [];
     let worstLevel = '';
     for (const [stage, cfg] of Object.entries(CONFIGS)) {
@@ -105,7 +107,7 @@ describe('报告层严重度方向', () => {
     console.log(`\n  → 最差场景出现 critical？${worstLevel === 'critical' ? '是' : '否'}`);
   });
 
-  it('场景 B：纵低横高（偏科）→ 落 overwhelmed → riskLevel', () => {
+  it('场景 B：纵低横高（偏科）→ 落 passive → riskLevel', () => {
     const out: string[] = [];
     let gotCritical = false;
     for (const [stage, cfg] of Object.entries(CONFIGS)) {
@@ -154,27 +156,16 @@ describe('报告层严重度方向', () => {
     console.log(`\n  → 偏科场景出现 critical？${gotCritical ? '是' : '否'}`);
   });
 
-  it('对照：象限编号约定（types/assessment.ts）与代码坐标是否一致', () => {
-    // 注释说：第一象限(右上=双高)=optimal, 第二象限(左上=纵高横低)=strategy,
-    //         第三象限(左下=双低)=passive, 第四象限(右下=纵低横高)=overwhelmed
-    // 代码：optimal=双高, strategy=好差(纵高横低), passive=双差, overwhelmed=差好(纵低横高)
-    const map: Record<string, string> = {
-      optimal: '第一象限(右上/双高)',
-      strategy: '第二象限(左上/纵高横低)',
-      passive: '第三象限(左下/双低)',
-      overwhelmed: '第四象限(右下/纵低横高)',
-    };
-    const check: Record<string, string> = {
-      optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好',
-    };
-    console.log('\n【象限编号 vs 代码坐标】');
-    for (const [id, quadrantNo] of Object.entries(map)) {
-      console.log(`  ${id.padEnd(12)} ${quadrantNo.padEnd(22)} 代码坐标=${check[id]}`);
+  it('对照：象限 id 与语义坐标的映射 == 生产真值表', () => {
+    // 约定 Q：双差 = overwhelmed（最差，红 / critical）；差好 = passive（需引导）
+    // 唯一真源 = src/lib/scoring/quadrant-geometry.ts 的 QUADRANT_COORDINATE
+    console.log('\n【象限 id vs 生产真值表坐标】');
+    for (const id of ['optimal', 'strategy', 'passive', 'overwhelmed'] as const) {
+      console.log(`  ${id.padEnd(12)} 代码坐标=${QUADRANT_COORDINATE[id]}`);
     }
-    // 全部一致 → 代码与 types 注释自洽
-    expect(check['optimal']).toBe('高高');
-    expect(check['strategy']).toBe('好差');
-    expect(check['passive']).toBe('双差');
-    expect(check['overwhelmed']).toBe('差好');
+    expect(QUADRANT_COORDINATE.optimal).toBe('高高');
+    expect(QUADRANT_COORDINATE.strategy).toBe('好差');
+    expect(QUADRANT_COORDINATE.overwhelmed).toBe('双差');
+    expect(QUADRANT_COORDINATE.passive).toBe('差好');
   });
 });
