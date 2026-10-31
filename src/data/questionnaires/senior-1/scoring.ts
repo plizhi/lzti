@@ -45,9 +45,11 @@ export const senior1ParentScoring: ScoringConfig = {
     { axisId: 'method-awareness', questionIds: ['s1-par-as-1'] },
     { axisId: 'flexibility', questionIds: ['s1-par-as-2', 's1-par-as-3'] },
     // 支持连接
-    // 轴序说明：axes 数组的第一项是运行时纵轴，第二项是横轴。
-    // 本卷必须与 questionnaire.ts 声明的 ['support-awareness', 'active-connection'] 保持一致，
-    // 否则家长卷的纵横轴会与学生卷、与象限文案的语义整体颠倒（2026-10-31 修正）。
+    // 轴序说明（2026-10-31 更正）：本文件是**参考配置**，生产计分走
+    // assessment.service.ts 的 buildScoringConfig()，它按 questionnaire.ts
+    // 声明的 axes 顺序现场推导，不读本文件。
+    // 本次调整只为让本文件与 questionnaire.ts 保持一致（便于阅读与对照），
+    // **不影响线上计算结果**。运行时轴序始终以 questionnaire.ts 为准。
     { axisId: 'support-awareness', questionIds: ['s1-par-sp-3'] },
     { axisId: 'active-connection', questionIds: ['s1-par-sp-1', 's1-par-sp-2'] },
   ],
@@ -72,7 +74,7 @@ export const senior1TeacherScoring: ScoringConfig = {
     { axisId: 'method-awareness', questionIds: ['s1-tea-as-1'] },
     { axisId: 'flexibility', questionIds: ['s1-tea-as-2', 's1-tea-as-3'] },
     // 支持连接
-    // 轴序说明：同家长卷，必须与 questionnaire.ts 声明顺序一致（2026-10-31 修正）。
+    // 轴序说明：同家长卷，本文件为参考配置，生产计分走 buildScoringConfig（2026-10-31 更正）。
     { axisId: 'support-awareness', questionIds: ['s1-tea-sp-2'] },
     { axisId: 'active-connection', questionIds: ['s1-tea-sp-1', 's1-tea-sp-3'] },
   ],

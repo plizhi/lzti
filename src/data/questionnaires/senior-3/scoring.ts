@@ -42,8 +42,10 @@ export const senior3ParentScoring: ScoringConfig = {
     { axisId: 'goal-specificity', questionIds: ['s3-par-ga-1'] },
     { axisId: 'action-consistency', questionIds: ['s3-par-ga-2', 's3-par-ga-3'] },
     // 压力韧性
-    // 轴序说明：axes 第一项是运行时纵轴。本卷必须与 questionnaire.ts 声明的
-    // ['emotion-regulation', 'action-maintenance'] 一致，否则家长卷纵横轴整体颠倒（2026-10-31 修正）。
+    // 轴序说明（2026-10-31 更正）：本文件是**参考配置**，生产计分走
+    // assessment.service.ts 的 buildScoringConfig()，按 questionnaire.ts 声明的
+    // axes 顺序现场推导，不读本文件。本次调整只为与 questionnaire.ts 保持一致，
+    // **不影响线上计算结果**。
     { axisId: 'emotion-regulation', questionIds: ['s3-par-pr-2', 's3-par-pr-3'] },
     { axisId: 'action-maintenance', questionIds: ['s3-par-pr-1'] },
     // 关系自主
@@ -68,7 +70,7 @@ export const senior3TeacherScoring: ScoringConfig = {
     { axisId: 'goal-specificity', questionIds: ['s3-tea-ga-1'] },
     { axisId: 'action-consistency', questionIds: ['s3-tea-ga-2', 's3-tea-ga-3'] },
     // 压力韧性
-    // 轴序说明：同家长卷，必须与 questionnaire.ts 声明顺序一致（2026-10-31 修正）。
+    // 轴序说明：同家长卷，本文件为参考配置，生产计分走 buildScoringConfig（2026-10-31 更正）。
     { axisId: 'emotion-regulation', questionIds: ['s3-tea-pr-2', 's3-tea-pr-3'] },
     { axisId: 'action-maintenance', questionIds: ['s3-tea-pr-1'] },
     // 关系自主

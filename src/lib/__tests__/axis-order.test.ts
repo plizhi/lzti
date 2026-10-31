@@ -1,102 +1,134 @@
-// 不变式测试：scoring.ts 的 axes 顺序必须与 questionnaire.ts 声明的 axes 顺序一致
+// 不变式测试：**运行时计分配置**的轴序必须与 questionnaire.ts 声明一致
 //
-// 背景（2026-10-31）：
-//   计分器把 scoringConfig.axes 数组的**第一项当纵轴、第二项当横轴**
-//   （calculator.ts calculateAllDimensionScores）。
-//   而象限文案的语义是按 questionnaire.ts 声明的 axes 顺序写的。
-//   两者不一致 → 该维度在这个卷上纵横轴整体颠倒，报告会贴错象限。
+// ⚠️ 重要更正（2026-10-31，朋大大提供的另一份 AI 对账后核实）：
+//   此前版本的 axis-order.test.ts 校验的是 src/data/questionnaires/*/scoring.ts，
+//   并把它当成"线上 bug 的修法"。**那是错的**：
+//     - src/data/questionnaires/*/scoring.ts 是**参考配置**，生产计分不读它。
+//     - 真正的运行时配置由 assessment.service.ts 的 buildScoringConfig() 现场推导：
+//         轴序 = questionnaire.ts 里 dimension.axes 的声明顺序
+//         题目归属 = 按 question.dimensionId + question.axisId 过滤
+//     - 所以历史上"轴序 4 处不一致"发生在死配置里，**从未影响线上结果**。
 //
-//   实测曾有 4 处不一致：
-//     senior-1 支持连接（家长卷、教师卷）
-//     senior-3 压力韧性（家长卷、教师卷）
-//   2026-10-31 已修正。本测试锁死这个不变式，防止以后再被改坏。
+// 本测试改为校验真正影响运行的那条路径：复刻 buildScoringConfig 的推导逻辑，
+// 断言运行时轴序 == questionnaire.ts 声明顺序，且题目归属正确。
 //
-//   只校验**顺序**，不校验题目归属（题目归属是另一件事，另行检查）。
+// 为什么这条仍值得锁：
+//   象限文案的语义是按 questionnaire.ts 的轴序写的。
+//   一旦有人改了 questionnaire.ts 的 axes 顺序而没同步改文案，
+//   报告会贴错象限 —— 这正是我们要防的那类错误。
 import { describe, it, expect } from 'vitest';
 import { questionnaires } from '@/data/questionnaires';
-import {
-  senior1StudentScoring, senior1ParentScoring, senior1TeacherScoring,
-} from '@/data/questionnaires/senior-1/scoring';
-import {
-  senior3StudentScoring, senior3ParentScoring, senior3TeacherScoring,
-} from '@/data/questionnaires/senior-3/scoring';
-import {
-  junior3StudentScoring, junior3ParentScoring, junior3TeacherScoring,
-} from '@/data/questionnaires/junior-3/scoring';
-import {
-  middleSchoolStudentScoring, middleSchoolParentScoring, middleSchoolTeacherScoring,
-} from '@/data/questionnaires/middle-school/scoring';
-import {
-  primaryHighStudentScoring, primaryHighParentScoring, primaryHighTeacherScoring,
-} from '@/data/questionnaires/primary-high/scoring';
-import {
-  primaryLowStudentScoring, primaryLowParentScoring, primaryLowTeacherScoring,
-} from '@/data/questionnaires/primary-low/scoring';
 import type { StageId } from '@/types/stage';
-import type { ScoringConfig } from '@/types/questionnaire';
-
-const CONFIGS: Record<StageId, Record<string, ScoringConfig>> = {
-  'primary-low': {
-    student: primaryLowStudentScoring, parent: primaryLowParentScoring, teacher: primaryLowTeacherScoring,
-  },
-  'primary-high': {
-    student: primaryHighStudentScoring, parent: primaryHighParentScoring, teacher: primaryHighTeacherScoring,
-  },
-  'junior-1': {
-    student: middleSchoolStudentScoring, parent: middleSchoolParentScoring, teacher: middleSchoolTeacherScoring,
-  },
-  'junior-3': {
-    student: junior3StudentScoring, parent: junior3ParentScoring, teacher: junior3TeacherScoring,
-  },
-  'senior-1': {
-    student: senior1StudentScoring, parent: senior1ParentScoring, teacher: senior1TeacherScoring,
-  },
-  'senior-3': {
-    student: senior3StudentScoring, parent: senior3ParentScoring, teacher: senior3TeacherScoring,
-  },
-};
+import type { Questionnaire, Question, ScoringConfig } from '@/types/questionnaire';
 
 const STAGES: StageId[] = [
   'primary-low', 'primary-high', 'junior-1', 'junior-3', 'senior-1', 'senior-3',
 ];
 
-describe('scoring 轴序与问卷声明一致', () => {
+/**
+ * 复刻 assessment.service.ts 的 buildScoringConfig()（该函数当前是私有的）。
+ * 逐行对照 src/lib/services/assessment.service.ts:49-88。
+ */
+function buildScoringConfigLikeRuntime(
+  questionnaire: Questionnaire,
+  questions: Question[],
+): ScoringConfig {
+  const axes: { axisId: string; questionIds: string[] }[] = [];
+  const reverseQuestions: string[] = [];
+
+  for (const dimension of questionnaire.dimensions) {
+    const axis1Id = typeof dimension.axes[0] === 'string' ? dimension.axes[0] : dimension.axes[0].id;
+    const axis2Id = typeof dimension.axes[1] === 'string' ? dimension.axes[1] : dimension.axes[1].id;
+
+    const axis1Questions = questions.filter(
+      (q) => q.dimensionId === dimension.id && q.axisId === axis1Id,
+    );
+    const axis2Questions = questions.filter(
+      (q) => q.dimensionId === dimension.id && q.axisId === axis2Id,
+    );
+
+    if (axis1Questions.length > 0) {
+      axes.push({ axisId: axis1Id, questionIds: axis1Questions.map((q) => q.id) });
+      axis1Questions.filter((q) => q.reverse).forEach((q) => reverseQuestions.push(q.id));
+    }
+    if (axis2Questions.length > 0) {
+      axes.push({ axisId: axis2Id, questionIds: axis2Questions.map((q) => q.id) });
+      axis2Questions.filter((q) => q.reverse).forEach((q) => reverseQuestions.push(q.id));
+    }
+  }
+
+  return {
+    stageId: questionnaire.stageId,
+    questionnaireType: 'parent',
+    axes,
+    reverseQuestions,
+  };
+}
+
+const PAPER_KEYS = ['studentQuestions', 'parentQuestions', 'teacherQuestions'] as const;
+const PAPER_NAMES = ['学生卷', '家长卷', '教师卷'];
+
+describe('运行时计分配置的轴序', () => {
   for (const stage of STAGES) {
     const q = questionnaires[stage];
-    const configs = CONFIGS[stage];
 
-    // questionId → dimensionId（从问卷自带的题目数组建）
-    const qDim = new Map<string, string>();
-    for (const list of [q.studentQuestions, q.parentQuestions, q.teacherQuestions]) {
-      for (const qq of list ?? []) qDim.set(qq.id, qq.dimensionId);
-    }
+    for (let i = 0; i < PAPER_KEYS.length; i++) {
+      const key = PAPER_KEYS[i];
+      const paperName = PAPER_NAMES[i];
+      const questions = q[key] ?? [];
+      if (questions.length === 0) continue;
 
-    for (const [type, config] of Object.entries(configs)) {
-      it(`${q.name}（${stage}）${type}卷：每个维度的轴序与问卷声明一致`, () => {
-        // 按 dimensionId 把 config.axes 分组（保持数组内原有顺序）
+      it(`${q.name}（${stage}）${paperName}：运行时轴序与问卷声明一致`, () => {
+        const cfg = buildScoringConfigLikeRuntime(q, questions);
+
+        // 按 dimensionId 把运行时 axes 分组（保持运行时数组内的顺序）
         const byDim = new Map<string, string[]>();
-        for (const ax of config.axes) {
+        for (const ax of cfg.axes) {
           const first = ax.questionIds[0];
-          expect(first, `${stage}/${type} 轴 ${ax.axisId} 没有题目`).toBeTruthy();
-          const dimId = qDim.get(first);
-          expect(dimId, `${stage}/${type} 题目 ${first} 在问卷里找不到所属维度`).toBeTruthy();
-          if (!byDim.has(dimId!)) byDim.set(dimId!, []);
-          byDim.get(dimId!)!.push(ax.axisId);
+          const qq = questions.find((x) => x.id === first);
+          expect(qq, `${stage}/${paperName} 轴 ${ax.axisId} 的首个题目 ${first} 不在卷内`).toBeTruthy();
+          const dimId = qq!.dimensionId;
+          if (!byDim.has(dimId)) byDim.set(dimId, []);
+          byDim.get(dimId)!.push(ax.axisId);
         }
 
         for (const dim of q.dimensions) {
           const declared = dim.axes.map((a) => (typeof a === 'string' ? a : a.id));
           const actual = byDim.get(dim.id);
-          expect(actual, `${stage}/${type} 卷的计分配置缺少维度 ${dim.id}`).toBeTruthy();
+          expect(actual, `${stage}/${paperName} 的计分配置缺少维度 ${dim.id}`).toBeTruthy();
           expect(
             actual,
-            `${stage}/${type} 卷 ${dim.id} 的轴序与问卷声明不一致：\n` +
+            `${stage}/${paperName} 卷 ${dim.id} 的运行时轴序与问卷声明不一致：\n` +
             `  问卷声明: ${declared.join(', ')}\n` +
-            `  计分配置: ${actual!.join(', ')}\n` +
-            `  → 纵横轴会整体颠倒，报告会贴错象限`,
+            `  运行时   : ${actual!.join(', ')}\n` +
+            `  → 象限文案是按问卷声明的轴序写的，轴序一错，报告会贴错象限`,
           ).toEqual(declared);
         }
       });
     }
+  }
+});
+
+describe('运行时配置的题目归属', () => {
+  for (const stage of STAGES) {
+    const q = questionnaires[stage];
+    const questions = q.studentQuestions ?? [];
+
+    it(`${q.name}（${stage}）：每个维度的每道题都归到声明的轴上，且两轴都不为空`, () => {
+      const cfg = buildScoringConfigLikeRuntime(q, questions);
+      for (const dim of q.dimensions) {
+        const axisIds = dim.axes.map((a) => (typeof a === 'string' ? a : a.id));
+        const dimQs = questions.filter((x) => x.dimensionId === dim.id);
+        for (const axId of axisIds) {
+          const n = dimQs.filter((x) => x.axisId === axId).length;
+          expect(n, `${stage}/${dim.id} 轴 ${axId} 没有题目`).toBeGreaterThan(0);
+        }
+        // 两轴题目数之和 == 该维度题目总数（没有游离题）
+        const total = axisIds.reduce(
+          (sum, axId) => sum + dimQs.filter((x) => x.axisId === axId).length, 0,
+        );
+        expect(total, `${stage}/${dim.id} 有题目没归到任何轴上`).toBe(dimQs.length);
+      }
+    });
   }
 });
