@@ -27,6 +27,19 @@ BACKUP_DIR="${LZTI_BACKUP_DIR:-/home/pupeng/.openclaw/workspace/docs/backup}"
 BACKUP="${BACKUP_DIR}/lzti_dev_demo_${TS}.sql"
 mkdir -p "$BACKUP_DIR"
 
+# 🔴 库名闸门（2026-11-01 补）
+# 本脚本会 DELETE 生产级表（SessionAttempt / AssessmentSession / Child …）。
+# LZTI_ENV_FILE 可被环境变量覆盖 → 万一指向生产 .env，就会直接删生产库数据。
+# 生产库里有真实用户的 Child（实测 6 条），这不是能靠「小心点」解决的风险。
+# 硬性拦下：库名不是 lzti_dev 一律拒绝执行。
+DB_NAME=$(basename "${PGURL%%\?*}")
+if [ "$DB_NAME" != "lzti_dev" ]; then
+  echo "✗ 拒绝执行：目标库是 ${DB_NAME}，不是 lzti_dev" >&2
+  echo "  本脚本只允许清理演示库（lzti_dev）。" >&2
+  echo "  如确认要清别的库，请改用该库自己的清理方式，不要绕过这道闸门。" >&2
+  exit 1
+fi
+
 echo "=== 模式: ${MODE}"
 echo "=== 1) 备份 → ${BACKUP}"
 pg_dump "$PGURL" --data-only \
