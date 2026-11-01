@@ -1,4 +1,4 @@
-// 初中非毕业年级（初一、初二）问卷数据
+// 初一、初二问卷数据
 
 import type { Questionnaire, Dimension, Question } from '@/types/questionnaire';
 
@@ -240,7 +240,7 @@ export const middleSchoolTeacherQuestions: Question[] = [
 export const middleSchoolQuestionnaire: Questionnaire = {
   id: 'middle-school',
   stageId: 'junior-1',
-  name: '初中非毕业班（初一、初二）',
+  name: '初一初二班',
   dimensions: middleSchoolDimensions,
   studentQuestions: middleSchoolQuestions,
   parentQuestions: middleSchoolParentQuestions,

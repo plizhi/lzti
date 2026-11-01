@@ -1,4 +1,4 @@
-// 初三（初三大）问卷数据
+// 初三问卷数据
 
 import type { Questionnaire, Dimension, Question } from '@/types/questionnaire';
 
@@ -201,7 +201,7 @@ export const junior3TeacherQuestions: Question[] = [
 export const junior3Questionnaire: Questionnaire = {
   id: 'junior-3',
   stageId: 'junior-3',
-  name: '初三大（初三）',
+  name: '初三',
   dimensions: junior3Dimensions,
   studentQuestions: junior3Questions,
   parentQuestions: junior3ParentQuestions,

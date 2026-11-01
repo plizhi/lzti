@@ -1,4 +1,4 @@
-// 初三大（初三）计分配置
+// 初三计分配置
 // 轴-题目映射与反向题列表
 
 import type { ScoringConfig } from '@/types/questionnaire';
