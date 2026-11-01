@@ -39,7 +39,7 @@ export const stages: Record<StageId, Stage> = {
   },
   'junior-1': {
     id: 'junior-1',
-    name: '初中非毕业',
+    name: '初一初二',
     gradeRange: '初一、初二',
     coreAbility: '韧性萌芽与规划能力',
     dimensionCount: 4,
@@ -47,7 +47,7 @@ export const stages: Record<StageId, Stage> = {
   },
   'junior-3': {
     id: 'junior-3',
-    name: '初三大',
+    name: '初三',
     gradeRange: '初三',
     coreAbility: '基于规划能力的心理韧性',
     dimensionCount: 7,

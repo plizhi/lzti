@@ -1,4 +1,4 @@
-// 初中非毕业（初一、初二）计分配置
+// 初一、初二计分配置
 // 轴-题目映射与反向题列表
 
 import type { ScoringConfig } from '@/types/questionnaire';
