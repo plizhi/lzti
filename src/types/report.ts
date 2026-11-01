@@ -82,6 +82,27 @@ export interface SingleReport {
   createdAt: Date;
 }
 
+// 跨视角对比
+//
+// 参与对比的视角。同一份测评（session）里每个视角只能提交一次，
+// 因此这里的角色是「本场已完成哪些视角」的枚举。
+export type ComparisonRole = 'parent' | 'student' | 'teacher';
+
+// 维度未纳入对比的原因
+export type SkippedDimensionReason =
+  // 某一方该维度无有效数据（某轴一道题都没答上 / 题号对不上）
+  | 'incomplete'
+  // 某一方该维度落在中性带（两轴都在 2.5~3.5），没有明显倾向 → 不产出象限
+  | 'neutral';
+
+export interface SkippedDimension {
+  dimensionId: string;
+  dimensionName: string;
+  reason: SkippedDimensionReason;
+  // 缺数据 / 中性带的具体是哪个视角（只有一个缺失方时才有值）
+  missingRole?: ComparisonRole;
+}
+
 // ============================================================
 // 亲子对比报告
 // ============================================================
@@ -138,6 +159,32 @@ export interface ParentChildComparisonReport {
     color: string;
     data: number[];
   }>;
+  // 未纳入对比的维度及原因（数据不全 / 中性带）
+  skippedDimensions?: SkippedDimension[];
+  createdAt: Date;
+}
+
+// 通用两视角对比报告（任意两个视角，如家长 + 老师）
+export interface TwoRoleComparisonReport {
+  id: string;
+  // 实际参与对比的两个视角（顺序固定：parent > student > teacher）
+  roles: ComparisonRole[];
+  // 各视角对应的 attemptId
+  attemptIds: Partial<Record<ComparisonRole, string>>;
+  comparisonStatuses: ComparisonStatus[];
+  comparisonSuggestions: ComparisonSuggestion[];
+  // 亮点和待引导
+  highlights: Array<{ dimensionId: string; description: string }>;
+  developmentAreas: Array<{ dimensionId: string; description: string }>;
+  // 雷达图数据
+  radarLabels: string[];
+  radarDatasets: Array<{
+    label: string;
+    color: string;
+    data: number[];
+  }>;
+  // 未纳入对比的维度及原因（数据不全 / 中性带）
+  skippedDimensions?: SkippedDimension[];
   createdAt: Date;
 }
 
@@ -167,5 +214,7 @@ export interface HomeSchoolComparisonReport {
     color: string;
     data: number[];
   }>;
+  // 未纳入对比的维度及原因（数据不全 / 中性带）
+  skippedDimensions?: SkippedDimension[];
   createdAt: Date;
 }

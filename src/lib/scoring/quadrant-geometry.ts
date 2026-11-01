@@ -16,9 +16,11 @@
 //   '差好' = 纵轴低 + 横轴高
 //   '双差' = 纵轴低 + 横轴低（双差，最差）
 //
-// ⚠️ 当前约定（约定Q）：双差 = passive。
-//    数据侧 16/22 个维度是按「双差 = 最差 = overwhelmed」写的，与本约定冲突 → 见
-//    docs/象限语义真值表.md。待朋大大拍板后，只需改本文件的 QUADRANT_COORDINATE。
+// ✅ 当前约定（约定 Q，2026-11-01 朋大大拍板）：双差 = overwhelmed（红 / critical / 需主动关注），
+//    差好 = passive（灰 / medium / 需引导）。
+//    理由：双差 = 内在资源与外在表现都低于中性，是最该主动关注的一格；
+//    差好 = 有表现、缺内在驱动，属于该引导而非急救。
+//    数据侧已按本约定重贴（见 quadrant-truth-table.ts 与 quadrant-semantics.test.ts）。
 import type { QuadrantType } from '@/lib/scoring/quadrant';
 
 /** 语义坐标 */
@@ -31,16 +33,16 @@ export type SemanticCoordinate = '高高' | '好差' | '差好' | '双差';
 export const QUADRANT_COORDINATE: Record<QuadrantType, SemanticCoordinate> = {
   optimal: '高高',
   strategy: '好差',
-  overwhelmed: '差好',
-  passive: '双差',
+  overwhelmed: '双差',
+  passive: '差好',
 };
 
 /** 语义坐标 → 象限 id（上面的逆映射） */
 export const COORDINATE_QUADRANT: Record<SemanticCoordinate, QuadrantType> = {
   高高: 'optimal',
   好差: 'strategy',
-  差好: 'overwhelmed',
-  双差: 'passive',
+  差好: 'passive',
+  双差: 'overwhelmed',
 };
 
 /**

@@ -25,8 +25,8 @@ export const multiTaskManagementDimension: Dimension = {
   quadrants: [
     { id: 'optimal', name: '统筹兼顾型', description: '有清晰的任务清单和优先级，并能高效执行。', guidance: '提高任务的挑战性，引入长期项目制管理，培养其带领他人的能力。' },
     { id: 'strategy', name: '纸上谈兵型', description: '能做出完美的计划表，但严重缺乏执行。', guidance: '做减法，从日计划缩到只规划接下来1小时，设置极小的启动目标。' },
-    { id: 'passive', name: '随波逐流型', description: '既无计划，也难执行。被任务洪流裹挟。', guidance: '家长暂时充当"外部大脑"，从带着一起规划"就两件事"开始。' },
-    { id: 'overwhelmed', name: '野蛮生长型', description: '非常有执行力，但毫无规划。靠"堆时间"硬扛。', guidance: '重点引导进行"复盘"，让他亲眼对比自己花了多少无用功。' },
+    { id: 'overwhelmed', name: '随波逐流型', description: '既无计划，也难执行。被任务洪流裹挟。', guidance: '家长暂时充当"外部大脑"，从带着一起规划"就两件事"开始。' },
+    { id: 'passive', name: '野蛮生长型', description: '非常有执行力，但毫无规划。靠"堆时间"硬扛。', guidance: '重点引导进行"复盘"，让他亲眼对比自己花了多少无用功。' },
   ],
 };
 
@@ -53,8 +53,8 @@ export const goalPlanningDimension: Dimension = {
   quadrants: [
     { id: 'optimal', name: '志存高远型', description: '有清晰远大的目标，并能一步步拆解为当下的行动计划。', guidance: '协助评估路径的合理性，关注过程中的心理调适。' },
     { id: 'strategy', name: '空想家型', description: '有美好向往的目标，但完全不知如何实现。', guidance: '帮助"画地图"，引入"以终为始"的倒推法，锁定第一个最小的突破口。' },
-    { id: 'passive', name: '无舵之舟型', description: '既没有方向，也找不到路。自我同一性未建立。', guidance: '暂停催促，引入生涯探索，通过职业体验、人物访谈等方式找到意义感。' },
-    { id: 'overwhelmed', name: '实干家型', description: '没有远大目标，但能把眼前任务执行得很好。', guidance: '引导将"把事做好"的习惯与对未来思考连接，找到成就感来源。' },
+    { id: 'overwhelmed', name: '无舵之舟型', description: '既没有方向，也找不到路。自我同一性未建立。', guidance: '暂停催促，引入生涯探索，通过职业体验、人物访谈等方式找到意义感。' },
+    { id: 'passive', name: '实干家型', description: '没有远大目标，但能把眼前任务执行得很好。', guidance: '引导将"把事做好"的习惯与对未来思考连接，找到成就感来源。' },
   ],
 };
 
@@ -80,9 +80,9 @@ export const academicAttributionDimension: Dimension = {
   ],
   quadrants: [
     { id: 'optimal', name: '成长型思维', description: '把成功归因为努力和方法，失败归因为需要调整环节。', guidance: '持续强化过程，而非赞美"聪明"。' },
-    { id: 'strategy', name: '自负型思维', description: '把成功归因于"聪明"，把失败归因于外部。', guidance: '赞美要具体指向"努力"而非"聪明"，用略有挑战的任务体验失败。' },
-    { id: 'passive', name: '习得性无助', description: '将失败归于永久的不可控内部因素，将成功归于外界和运气。', guidance: '制造"可被明确归因为个人努力"的绝对能完成的小成功体验。' },
-    { id: 'overwhelmed', name: '焦灼型思维', description: '把失败全部归因为"还不够努力"，陷入自责而忽略方法反思。', guidance: '建立"努力+策略"的双因素模型，帮其精细归因。' },
+    { id: 'passive', name: '自负型思维', description: '把成功归因于"聪明"，不认为努力能改变结果；但失败时仍能具体拆解，不一味归咎外部。', guidance: '赞美要具体指向"努力"而非"聪明"；同时帮他把失败拆到具体环节，别停在"都是我的问题"或"都怪别人"。' },
+    { id: 'overwhelmed', name: '习得性无助', description: '将失败归于永久的不可控内部因素，将成功归于外界和运气。', guidance: '制造"可被明确归因为个人努力"的绝对能完成的小成功体验。' },
+    { id: 'strategy', name: '焦灼型思维', description: '把失败全部归因为"还不够努力"，陷入自责而忽略方法反思。', guidance: '建立"努力+策略"的双因素模型，帮其精细归因。' },
   ],
 };
 
@@ -108,9 +108,9 @@ export const emotionalResilienceDimension: Dimension = {
   ],
   quadrants: [
     { id: 'optimal', name: '大心脏型', description: '心理承受能力强，不容易被小事扰动，能快速消化。', guidance: '教会共情，避免因过于钝感而无意中伤害敏感的同学。' },
-    { id: 'strategy', name: '玻璃心型', description: '极其敏感，一次失利或一句评价就能让他们崩溃，且长时间难以平复。', guidance: '先进行情绪辅导，教他识别情绪、为情绪命名，通过安全方式外化。' },
-    { id: 'passive', name: '雷打不动型', description: '对什么都满不在乎，用"隔离"防御了所有情绪。', guidance: '找到在学习之外真正在乎的事情，唤醒感受力。' },
-    { id: 'overwhelmed', name: '敏感而坚韧', description: '有敏锐的感受力，能感知压力，但拥有强大的调节能力。', guidance: '鼓励分享调节经验，成为同伴的支持者。' },
+    { id: 'overwhelmed', name: '玻璃心型', description: '极其敏感，一次失利或一句评价就能让他们崩溃，且长时间难以平复。', guidance: '先进行情绪辅导，教他识别情绪、为情绪命名，通过安全方式外化。' },
+    { id: 'strategy', name: '雷打不动型', description: '对什么都满不在乎，用"隔离"防御了所有情绪。', guidance: '找到在学习之外真正在乎的事情，唤醒感受力。' },
+    { id: 'passive', name: '敏感而坚韧', description: '有敏锐的感受力，能感知压力，但拥有强大的调节能力。', guidance: '鼓励分享调节经验，成为同伴的支持者。' },
   ],
 };
 

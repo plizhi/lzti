@@ -51,14 +51,11 @@ const TRUTH: Record<string, Record<string, Semantic>> = Object.fromEntries(
   ]),
 ) as Record<string, Record<string, Semantic>>;
 
-/** 数据侧尚未重排、因此象限图文案归位仍错的维度 */
-const PENDING = new Set([
-  'basic-habits', 'emotional-adaptation', 'self-efficacy', 'academic-attribution',
-  'emotional-resilience', 'strategy-integration', 'goal-anchor', 'feedback-utilization',
-  'mental-stability', 'self-cognition', 'direction-exploration', 'academic-strategy',
-  'support-connection', 'decision-clarity', 'goal-action', 'pressure-resilience',
-  'relationship-autonomy',
-]);
+/**
+ * 数据侧尚未重排、因此象限图文案归位仍错的维度。
+ * 2026-11-01 约定 Q 落地 + id 重贴完成后已清零（空集）。
+ */
+const PENDING = new Set<string>([]);
 
 /** 由真值表反推：某维度每个语义格子「应该」显示哪条文案 */
 function expectedByCoordinate(
@@ -107,8 +104,8 @@ describe('象限图文案归位（全维度逐格核对）', () => {
       };
 
       if (PENDING.has(dim.id)) {
+        // 约定 Q 落地后已无待修维度；保留分支以防将来又出现错位。
         // 当前预期失败：数据侧 id 未重排 → 象限图文案贴错格子。
-        // 数据侧重排后，这个 fails 断言会失效 → vitest 报错提醒移除本维度。
         it.fails(`${title}（待修：数据侧象限 id 未重排）`, check);
       } else {
         it(title, check);
@@ -116,12 +113,11 @@ describe('象限图文案归位（全维度逐格核对）', () => {
     }
   }
 
-  it('待修清单与实际错位一致（防名单漂移）', () => {
+  it('全部维度均已归位（无待修）', () => {
     const actuallyWrong: string[] = [];
     for (const stage of STAGES) {
       const qn = questionnaires[stage];
       for (const dim of qn.dimensions) {
-        if (dim.id === 'academic-attribution') continue; // 内容缺格，另行处理
         const truth = TRUTH[dim.id];
         const expected = expectedByCoordinate(truth);
         const actual = quadrantNamesByCoordinate(
@@ -132,7 +128,7 @@ describe('象限图文案归位（全维度逐格核对）', () => {
     }
     expect(
       new Set(actuallyWrong),
-      '待修名单与实际错位维度不一致 —— 若刚修好了某个维度，请从 PENDING 移除',
-    ).toEqual(new Set([...PENDING].filter((d) => d !== 'academic-attribution')));
+      '出现象限图文案贴错格子的维度 —— 若刚改了某个维度，先查它的 id 是否已按真值表重贴',
+    ).toEqual(new Set([...PENDING]));
   });
 });

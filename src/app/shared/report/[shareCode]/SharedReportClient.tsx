@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { ComparisonSection } from './ComparisonSection';
+import type { SessionComparison } from './ComparisonSection';
 
 const typeLabels: Record<string, string> = {
   student: '学生自评',
@@ -50,6 +52,8 @@ interface ReportData {
   questionnaireType: string;
   scores: Record<string, { axis1: number; axis2: number }>;
   quadrants: Record<string, string>;
+  // 跨视角对比（2026-11-01）
+  comparison?: SessionComparison;
   report: {
     id: string;
     currentStatus: CurrentStatusItem[];
@@ -141,7 +145,7 @@ export function SharedReportClient({ shareCode }: SharedReportClientProps) {
   }
 
   const { report, sharedAt, expiresAt } = data;
-  const { child, stageName, questionnaireType, report: reportContent } = report;
+  const { child, stageName, questionnaireType, report: reportContent, comparison } = report;
 
   const isExpired = new Date(expiresAt) < new Date();
 
@@ -196,9 +200,15 @@ export function SharedReportClient({ shareCode }: SharedReportClientProps) {
                   <h3 className="font-medium text-stone-700">
                     {status.dimensionName ?? status.dimensionId}
                   </h3>
-                  <span className={`px-2 py-1 rounded-full text-xs ${quadrantLabels[status.quadrantType] ?? ''}`}>
-                    {status.quadrantName ?? status.quadrantType}
-                  </span>
+                  {status.quadrantType ? (
+                    <span className={`px-2 py-1 rounded-full text-xs ${quadrantLabels[status.quadrantType] ?? ''}`}>
+                      {status.quadrantName ?? status.quadrantType}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 rounded-full text-xs bg-stone-100 text-stone-500">
+                      数据接近中性
+                    </span>
+                  )}
                 </div>
                 {status.description && (
                   <p className="text-sm text-stone-600">{status.description}</p>
@@ -211,6 +221,9 @@ export function SharedReportClient({ shareCode }: SharedReportClientProps) {
             ))}
           </div>
         </div>
+
+        {/* 跨视角对比（每份报告都有：只有单一视角时也显示，不整块消失） */}
+        {comparison && <ComparisonSection comparison={comparison} />}
 
         {/* 变化趋势 */}
         {reportContent?.trendAnalysis && (
@@ -271,8 +284,13 @@ export function SharedReportClient({ shareCode }: SharedReportClientProps) {
 
         {/* 关注建议 */}
         {reportContent?.suggestions && reportContent.suggestions.length > 0 && (
-          <div className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-stone-800 mb-4">🎯 关注建议</h2>
+          <div className="rounded-2xl bg-white p-6 shadow-sm ring-2 ring-amber-200">
+            <h2 className="text-lg font-semibold text-stone-800 mb-2">🎯 关注引导与建设性建议</h2>
+            {comparison?.kind === 'none' && (
+              <p className="mb-4 text-xs text-stone-500 bg-stone-50 rounded-lg px-3 py-2">
+                以下是基于单一视角的初步判断，其他视角完成后结论会更新。
+              </p>
+            )}
             <div className="space-y-4">
               {reportContent.suggestions.map((s) => (
                 <div key={s.dimensionId} className="border-l-4 border-amber-400 pl-4">

@@ -3,11 +3,14 @@ import { ApiError } from '@/lib/api/response';
 import { validateStageId, validateQuestionnaireType } from '@/lib/validators';
 import { calculateAllDimensionScores } from '@/lib/scoring/calculator';
 import { determineAllQuadrants } from '@/lib/scoring';
+// 计分配置构建：2026-11-01 从本文件提取到 src/lib/scoring/build-scoring-config.ts，
+// 让跨视角对比模块能复用同一条生产计分路径。签名与行为与提取前逐字一致。
+import { buildScoringConfig } from '@/lib/scoring/build-scoring-config';
 import { getQuestionnaire } from '@/data/questionnaires';
 import { generateSingleReport } from '@/lib/report/generator';
 import { onReferralAssessed } from './referral.service';
 import { checkQuota, deductQuota } from './membership.service';
-import type { Questionnaire, Question, Dimension, ScoringConfig, ScoringAxisConfig } from '@/types/questionnaire';
+import type { Question, Dimension } from '@/types/questionnaire';
 import type { DimensionScores, DimensionQuadrants } from '@/types/assessment';
 import type { QuadrantType, TrendType, TrendAnalysis, DimensionTrend } from '@/types/report';
 
@@ -44,49 +47,6 @@ async function createReTestReminder(
       status: 'pending',
     },
   });
-}
-
-function buildScoringConfig(
-  questionnaire: Questionnaire,
-  questions: Question[]
-): ScoringConfig {
-  const axes: ScoringAxisConfig[] = [];
-  const reverseQuestions: string[] = [];
-
-  for (const dimension of questionnaire.dimensions) {
-    const axis1Id = typeof dimension.axes[0] === 'string' ? dimension.axes[0] : dimension.axes[0].id;
-    const axis2Id = typeof dimension.axes[1] === 'string' ? dimension.axes[1] : dimension.axes[1].id;
-
-    const axis1Questions = questions.filter(
-      (q) => q.dimensionId === dimension.id && q.axisId === axis1Id
-    );
-    const axis2Questions = questions.filter(
-      (q) => q.dimensionId === dimension.id && q.axisId === axis2Id
-    );
-
-    if (axis1Questions.length > 0) {
-      axes.push({
-        axisId: axis1Id,
-        questionIds: axis1Questions.map((q) => q.id),
-      });
-      axis1Questions.filter((q) => q.reverse).forEach((q) => reverseQuestions.push(q.id));
-    }
-
-    if (axis2Questions.length > 0) {
-      axes.push({
-        axisId: axis2Id,
-        questionIds: axis2Questions.map((q) => q.id),
-      });
-      axis2Questions.filter((q) => q.reverse).forEach((q) => reverseQuestions.push(q.id));
-    }
-  }
-
-  return {
-    stageId: questionnaire.stageId,
-    questionnaireType: 'parent',
-    axes,
-    reverseQuestions,
-  };
 }
 
 // 获取用户所有孩子的测评历史
@@ -360,9 +320,40 @@ export async function submitAttempt(
       throw new ApiError('问卷类型错误', 400);
   }
 
+  // 题号必须与本问卷该视角的题目对得上
+  //
+  // 背景（2026-10-31）：生产库有 3 条 attempt 的 answers 键是**旧题号** q1..q15，
+  // 与当前题号（li-1 / p-bh-1 等）对不上。这类记录算出来的每个轴都是「无数据」，
+  // 过去被兜底成中性 3 分 → 落双差 → 报告判成「最需要主动关注」。
+  // 从源头拦住：题号对不上 = 数据事故，不是合法作答。
+  //
+  // 说明：设备提交路径（/api/device/submit）的题号同样来自 getQuestionnaire，
+  // 与这里的题目集合一致，不会误伤。
+  const questionIds = new Set(questions.map((q) => q.id));
+  const unknownIds = Object.keys(data.answers).filter((id) => !questionIds.has(id));
+  if (unknownIds.length > 0) {
+    throw new ApiError(
+      `答案题号与当前问卷不匹配（${unknownIds.length} 个未知题号，例如：${unknownIds.slice(0, 3).join('、')}）`,
+      400
+    );
+  }
+
   const scoringConfig = buildScoringConfig(questionnaire, questions);
   const { scores } = calculateAllDimensionScores(scoringConfig, questions, data.answers);
   const quadrants = determineAllQuadrants(scores);
+
+  // 信息不足的维度（某轴一道题都没答上）不会落象限，也不会进风险等级。
+  // 这里记一条警告，便于运维发现「数据不完整」的提交。
+  const scoredDimensionIds = new Set(Object.keys(scores));
+  const missingDimensionIds = questionnaire.dimensions
+    .map((d) => d.id)
+    .filter((id) => !scoredDimensionIds.has(id));
+  if (missingDimensionIds.length > 0) {
+    console.warn(
+      `[提交] 数据不完整：${missingDimensionIds.length} 个维度无有效分数，已跳过（不落象限、不计风险）`,
+      { sessionId, questionnaireType, missingDimensionIds }
+    );
+  }
 
   // 扣次数与写入测评记录放在同一个事务：要么都成，要么都不成。
   const attempt = await prisma.$transaction(async (tx) => {

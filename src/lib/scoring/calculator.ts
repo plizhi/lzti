@@ -28,16 +28,27 @@ function getEffectiveScore(question: Question, answer: number): number {
 
 /**
  * 计算单个轴的原始均分（1-5范围）
+ *
+ * ⚠️ 返回 null 表示「这个轴没有数据」，**不是**中性分 3。
+ *
+ * 历史 bug（2026-10-31 修）：这里曾经兜底 `return 3`，
+ * 把「没有数据」静默变成「中性 3 分」→ `3.0 > 3` 为假 → 落「双差」→ 报告判成最差。
+ * 生产库那 3 条「answers 键是旧题号 q1..q15」的废记录就是这么变成「红 + critical」的。
+ *
+ * 「没有数据」和「数据是中性」是两件事，不能混为一谈。
+ *
  * @param questionIds 轴对应的题目ID列表
  * @param questions 完整题目列表
  * @param answers 用户答案
+ * @returns 原始均分；无数据返回 null
  */
 function calculateAxisRawScore(
   questionIds: string[],
   questions: Question[],
   answers: Record<string, number>
-): number {
-  if (questionIds.length === 0) return 3;
+): number | null {
+  // 轴上没有配题 → 无数据
+  if (questionIds.length === 0) return null;
 
   let total = 0;
   let count = 0;
@@ -53,7 +64,8 @@ function calculateAxisRawScore(
     count++;
   }
 
-  if (count === 0) return 3;
+  // 一道都没答上 → 无数据（题号对不上 / 未作答），不是中性分
+  if (count === 0) return null;
   return total / count;
 }
 
@@ -75,7 +87,10 @@ export function calculateDimensionScores(
   axisQuestionIds: [string[], string[]],
   questions: Question[],
   answers: Record<string, number>
-): { raw: { axis1: number; axis2: number }; normalized: { axis1: number; axis2: number } } {
+): {
+  raw: { axis1: number | null; axis2: number | null };
+  normalized: { axis1: number | null; axis2: number | null };
+} {
   const [axis1QuestionIds, axis2QuestionIds] = axisQuestionIds;
 
   const axis1Raw = calculateAxisRawScore(axis1QuestionIds, questions, answers);
@@ -84,14 +99,18 @@ export function calculateDimensionScores(
   return {
     raw: { axis1: axis1Raw, axis2: axis2Raw },
     normalized: {
-      axis1: normalizeScore(axis1Raw),
-      axis2: normalizeScore(axis2Raw),
+      axis1: axis1Raw === null ? null : normalizeScore(axis1Raw),
+      axis2: axis2Raw === null ? null : normalizeScore(axis2Raw),
     },
   };
 }
 
 /**
  * 根据计分配置计算所有维度得分
+ *
+ * ⚠️ **信息不足的维度不产生分数**（2026-10-31 修）：
+ * 任一轴无数据 → 该维度整体不写入 scores → 自然不落象限、不进风险等级。
+ * 这样「数据不完整」不会被误报成「状态最差」。
  */
 export function calculateAllDimensionScores(
   scoringConfig: ScoringConfig,
@@ -127,6 +146,9 @@ export function calculateAllDimensionScores(
       answers
     );
 
+    // 信息不足：任一轴无数据 → 该维度不落象限、不进风险等级
+    if (result.raw.axis1 === null || result.raw.axis2 === null) continue;
+
     // 原始分数用于象限判定
     scores[dimensionId] = {
       axis1: result.raw.axis1,
@@ -135,8 +157,8 @@ export function calculateAllDimensionScores(
 
     // 标准化分数用于雷达图
     normalizedScores[dimensionId] = {
-      axis1: result.normalized.axis1,
-      axis2: result.normalized.axis2,
+      axis1: result.normalized.axis1 as number,
+      axis2: result.normalized.axis2 as number,
     };
   }
 
@@ -156,11 +178,11 @@ export function determineQuadrantType(
 ): 'optimal' | 'strategy' | 'passive' | 'overwhelmed' {
   // 象限 id 与语义坐标的对应关系见 quadrant-geometry.ts（全项目唯一真源）。
   //
-  // 坐标约定：
+  // 约定 Q（2026-11-01 朋大大拍板）：
   //   纵高横高 = optimal      纵高横低 = strategy
-  //   纵低横高 = overwhelmed  纵低横低 = passive
+  //   纵低横高 = passive      纵低横低 = overwhelmed（最差 → 红 / critical）
   //
-  // ⚠️ 数据侧有 16/22 个维度是按「双低 = 最差 = overwhelmed」写的，与此约定冲突。
-  //    详见 docs/象限语义真值表.md；待约定拍板后，只需改 quadrant-geometry.ts 一处。
+  // 数据侧已按同一约定重贴（见 src/lib/scoring/quadrant-truth.ts 与
+  // src/lib/__tests__/quadrant-semantics.test.ts，两者不一致会被测试当场抓住）。
   return quadrantIdAt(coordinateOf(axis1Score, axis2Score, threshold));
 }

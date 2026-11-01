@@ -4,6 +4,7 @@ import { describe, it } from 'vitest';
 import { questionnaires } from '@/data/questionnaires';
 import { calculateAllDimensionScores, determineQuadrantType } from '@/lib/scoring/calculator';
 import { QUADRANT_COORDINATE } from '@/lib/scoring/quadrant-geometry';
+import { QUADRANT_TRUTH } from '@/lib/scoring/quadrant-truth';
 import { primaryLowStudentScoring } from '@/data/questionnaires/primary-low/scoring';
 import { primaryHighStudentScoring } from '@/data/questionnaires/primary-high/scoring';
 import { middleSchoolStudentScoring } from '@/data/questionnaires/middle-school/scoring';
@@ -11,31 +12,16 @@ import { junior3StudentScoring } from '@/data/questionnaires/junior-3/scoring';
 import { senior1StudentScoring } from '@/data/questionnaires/senior-1/scoring';
 import { senior3StudentScoring } from '@/data/questionnaires/senior-3/scoring';
 
-// 真值表（灵机独立判读，见 docs/象限语义真值表.md）
-const TRUTH: Record<string, Record<string, string>> = {
-  'learning-interest': { optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好' },
-  'basic-habits': { optimal: '高高', strategy: '差好', passive: '双差', overwhelmed: '好差' },
-  'emotional-adaptation': { optimal: '高高', strategy: '差好', passive: '好差', overwhelmed: '双差' },
-  'self-efficacy': { optimal: '高高', strategy: '差好', passive: '双差', overwhelmed: '好差' },
-  'strategy-coping': { optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好' },
-  'self-nurturing': { optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好' },
-  'multi-task-management': { optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好' },
-  'goal-planning': { optimal: '高高', strategy: '好差', passive: '双差', overwhelmed: '差好' },
-  'academic-attribution': { optimal: '高高', strategy: '双差', passive: '双差', overwhelmed: '好差' },
-  'emotional-resilience': { optimal: '高高', strategy: '双差', passive: '好差', overwhelmed: '差好' },
-  'strategy-integration': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'goal-anchor': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'feedback-utilization': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'mental-stability': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'self-cognition': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'direction-exploration': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'academic-strategy': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'support-connection': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'decision-clarity': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'goal-action': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'pressure-resilience': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-  'relationship-autonomy': { optimal: '高高', strategy: '好差', passive: '差好', overwhelmed: '双差' },
-};
+// 真值表唯一真源：src/lib/scoring/quadrant-truth.ts（按【文案名】索引）
+//
+// 本测试要回答的问题是「报告里显示的这条【文案】，真实语义坐标是什么」，
+// 所以按文案名查，而不是按 id 查 —— id 会随约定变化，文案语义不会。
+//
+// 2026-11-01：原先这里有一份自带的 id 索引副本，约定 Q 落地后成了过期真相，
+//           导致诊断输出误报「2 个维度错位」。已改为直接引用生产真值表。
+function truthCoordinate(dimId: string, name: string): string {
+  return QUADRANT_TRUTH[dimId]?.[name]?.coordinate ?? '?';
+}
 
 const CONFIGS: Record<string, any> = {
   'primary-low': primaryLowStudentScoring,
@@ -81,8 +67,9 @@ function run(label: string, answerValue: number) {
       const s = scores[dim.id];
       if (!s) continue;
       const qid = determineQuadrantType(s.axis1, s.axis2) as string;
-      const name = dim.quadrants.find((x) => x.id === qid)?.name ?? '?';
-      const truth = TRUTH[dim.id]?.[qid] ?? '?';
+      const entry = dim.quadrants.find((x) => x.id === qid);
+      const name = entry?.name ?? '?';
+      const truth = entry ? truthCoordinate(dim.id, entry.name) : '?';
       const codeCoord = QUADRANT_COORDINATE[qid as keyof typeof QUADRANT_COORDINATE];
       const correct = codeCoord === truth;
       if (!correct) bad++;
