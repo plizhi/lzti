@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export function apiSuccess(data: unknown, status = 200): NextResponse {
-  return NextResponse.json({ success: true, data }, { status });
+  // 带一个服务器时间戳：设备端固件靠它校正系统时间
+  // （固件 http_protocol.cc 的 SyncServerTime 读 root.timestamp / root.serverTime；
+  //  没有它，设备时间会停在 1970，屏幕与日志全是 tm_year=70）。
+  return NextResponse.json({ success: true, data, timestamp: Date.now() }, { status });
 }
 
 export function apiError(message: string, status = 400): NextResponse {
