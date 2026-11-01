@@ -702,7 +702,14 @@ function ReportList({
           >
             <div className="min-w-0">
               <p className="text-sm font-medium text-stone-700">{r.label}</p>
-              <p className="truncate text-xs text-stone-400">{r.url}</p>
+              <a
+                href={r.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block truncate text-xs text-amber-700 underline"
+              >
+                {r.url}
+              </a>
             </div>
             <button
               type="button"

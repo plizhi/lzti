@@ -101,6 +101,36 @@ export function normalizeByRule(text: string, min: number, max: number): number 
   return null;
 }
 
+
+/** LLM 兜底的配置：优先用通用 LLM_* 环境变量，没配就退回 MiniMax（有 key 就能用） */
+function resolveLlmConfig(): { url: string; apiKey: string; model: string } | null {
+  const explicitKey = process.env.LLM_API_KEY;
+  const explicitUrl = process.env.LLM_BASE_URL;
+  const explicitModel = process.env.LLM_MODEL;
+  if (explicitKey && explicitUrl) {
+    const url = explicitUrl.endsWith('/chat/completions')
+      ? explicitUrl
+      : `${explicitUrl.replace(/\/$/, '')}/v1/chat/completions`;
+    return { url, apiKey: explicitKey, model: explicitModel || 'MiniMax-Text-01' };
+  }
+
+  // 兼容原来那套 DeepSeek 配置
+  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  if (deepseekKey) {
+    return { url: 'https://api.deepseek.com/chat/completions', apiKey: deepseekKey, model: 'deepseek-chat' };
+  }
+
+  // 默认：MiniMax 的 OpenAI 兼容接口
+  const minimaxKey = process.env.MINIMAX_API_KEY;
+  if (!minimaxKey) return null;
+  const base = (process.env.MINIMAX_BASE_URL || 'https://api.minimaxi.com').replace(/\/$/, '');
+  return {
+    url: `${base}/v1/chat/completions`,
+    apiKey: minimaxKey,
+    model: explicitModel || 'MiniMax-Text-01',
+  };
+}
+
 /**
  * LLM 兜底判定。
  * 用严格的指令 + JSON mode，让模型只回答一个数字或 null。
@@ -109,8 +139,13 @@ async function normalizeByLLM(
   text: string,
   opts: NormalizeOptions
 ): Promise<number | null> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return null;
+  // 模型/地址/密钥全部走环境变量，换模型不用改代码。
+  // 默认用 MiniMax（服务器上本来就有这个 key）——
+  // 之前这里写死 DeepSeek，而 dev 环境根本没配 DEEPSEEK_API_KEY，
+  // 结果这层兜底一直是关着的，「选5」「选3」这类规则没覆盖的表达就全靠人工重说。
+  const llm = resolveLlmConfig();
+  if (!llm) return null;
+  const apiKey = llm.apiKey;
 
   const systemPrompt = `你是一个语音答题的答案解析器。用户说了一句话，你要判断他想选的选项是第几个。
 
@@ -122,7 +157,7 @@ async function normalizeByLLM(
 - 只输出 JSON，不要任何其他文字`;
 
   const body = {
-    model: 'deepseek-chat',
+    model: llm.model,
     messages: [
       { role: 'system', content: systemPrompt },
       {
@@ -133,11 +168,11 @@ async function normalizeByLLM(
       },
     ],
     max_tokens: 100,
-    response_format: { type: 'json_object' },
+    temperature: 0,
   };
 
   try {
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
+    const res = await fetch(llm.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -151,7 +186,12 @@ async function normalizeByLLM(
     const content = json?.choices?.[0]?.message?.content;
     if (!content) return null;
 
-    const parsed = JSON.parse(content);
+    // 有的模型会带 ```json 围栏，先剥掉再解析
+    const cleaned = String(content)
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+    const parsed = JSON.parse(cleaned);
     const value = parsed?.value;
     if (typeof value !== 'number') return null;
     if (value < opts.min || value > opts.max) return null;
