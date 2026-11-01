@@ -35,9 +35,14 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
   }
 
   const stageId = validateStageId(body.stageId);
-  const gender = normalizeDemoGender(body.gender);
-  if (!gender) {
-    throw new ApiError('请选择孩子性别', 400);
+  // 演示流程不再问性别（设备只有一个键，这一环没意义）：
+  // 不传就留空（Child.gender 可空）；传了就照旧识别，传错才报错。
+  const gender =
+    body.gender === undefined || body.gender === null || body.gender === ''
+      ? null
+      : normalizeDemoGender(body.gender);
+  if (gender === null && body.gender !== undefined && body.gender !== null && body.gender !== '') {
+    throw new ApiError('性别参数不合法', 400);
   }
 
   const questionnaire = getQuestionnaire(stageId);
@@ -50,8 +55,8 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
   const child = await prisma.child.create({
     data: {
       userId: device.userId,
-      name: `演示-${genderLabel(gender)}`,
-      gender,
+      name: gender ? `演示-${genderLabel(gender)}` : '演示',
+      gender: gender ?? null,
       grade: stageName,
     },
   });

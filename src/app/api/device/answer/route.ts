@@ -8,6 +8,8 @@ import {
   saveProgress,
 } from '@/lib/device-session';
 import { validateQuestionnaireType } from '@/lib/validators';
+import type { DeviceQuestionnaireType } from '@/lib/device-questions';
+import { buildVoiceQuestion, loadVoiceContext } from '@/lib/device-voice';
 
 interface AnswerBody {
   sessionId?: unknown;
@@ -36,7 +38,7 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
     throw new ApiError('请提供 session ID', 400);
   }
 
-  const questionnaireType = validateQuestionnaireType(body.questionnaireType);
+  const questionnaireType = validateQuestionnaireType(body.questionnaireType) as DeviceQuestionnaireType;
 
   const questionId = typeof body.questionId === 'string' ? body.questionId : '';
   if (!questionId) {
@@ -76,10 +78,26 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
     currentDimensionIndex ?? attempt?.currentDimensionIndex ?? 0
   );
 
+  // 顺带把【下一题】也返回了：设备端按键作答时就不用再发一次请求。
+  // （设备每次新建 HTTPS 连接要 4 秒多，两个来回 = 8~10 秒才出下一题；
+  //   一个来回就快一倍。）
+  let next: unknown = null;
+  let finished = false;
+  try {
+    const { stageId } = await loadVoiceContext(sessionId, device.userId, questionnaireType);
+    const nextState = await buildVoiceQuestion(stageId, questionnaireType, answers);
+    next = nextState;
+    finished = nextState.finished;
+  } catch (err) {
+    console.error('[answer] failed to build next question:', err);
+  }
+
   return apiSuccess({
     saved: true,
     attemptId: saved.id,
     currentDimensionIndex: saved.currentDimensionIndex ?? 0,
     answeredCount: Object.keys(answers).length,
+    finished,
+    next,
   });
 });
