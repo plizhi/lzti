@@ -30,6 +30,18 @@ function getApiKey(): string {
 export async function transcribe(audio: Buffer, filename: string): Promise<string> {
   const key = getApiKey();
 
+  // 【临时调试】把设备上传的原始音频落盘，用于定位 ASR 失败原因
+  if (filename.endsWith('.opus') && process.env.ASR_DEBUG_DUMP === '1') {
+    try {
+      const { writeFileSync } = await import('node:fs');
+      const p = `/tmp/lzti-asr-${Date.now()}.opus`;
+      writeFileSync(p, audio);
+      console.error(`[asr] dumped ${audio.length} bytes -> ${p} head=${audio.subarray(0, 16).toString('hex')}`);
+    } catch (e) {
+      console.error('[asr] dump failed:', e);
+    }
+  }
+
   const form = new FormData();
   form.append('model', 'asr-1.0');
   form.append(
