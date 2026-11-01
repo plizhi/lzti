@@ -184,23 +184,43 @@ async function normalizeByLLM(
       },
       body: JSON.stringify(body),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[normalize-llm] HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
+      return null;
+    }
 
     const json = (await res.json()) as any;
     const content = json?.choices?.[0]?.message?.content;
-    if (!content) return null;
+    if (!content) {
+      console.error('[normalize-llm] empty content:', JSON.stringify(json).slice(0, 300));
+      return null;
+    }
 
     // 有的模型会带 ```json 围栏，先剥掉再解析
     const cleaned = String(content)
       .replace(/```json/gi, '')
       .replace(/```/g, '')
       .trim();
-    const parsed = JSON.parse(cleaned);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      console.error(`[normalize-llm] bad JSON: ${cleaned.slice(0, 200)}`);
+      return null;
+    }
     const value = parsed?.value;
-    if (typeof value !== 'number') return null;
-    if (value < opts.min || value > opts.max) return null;
+    if (typeof value !== 'number') {
+      console.error(`[normalize-llm] value not a number: ${cleaned.slice(0, 200)}`);
+      return null;
+    }
+    if (value < opts.min || value > opts.max) {
+      console.error(`[normalize-llm] value out of range: ${value}`);
+      return null;
+    }
+    console.error(`[normalize-llm] "${text}" → ${value}`);
     return value;
-  } catch {
+  } catch (err) {
+    console.error('[normalize-llm] error:', err);
     return null;
   }
 }
