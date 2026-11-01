@@ -6,6 +6,7 @@ import {
   buildVoiceQuestion,
   loadVoiceContext,
 } from '@/lib/device-voice';
+import { packetsToOgg } from '@/lib/opus-ogg';
 import { requireOwnedSession, saveProgress } from '@/lib/device-session';
 import { normalizeAnswer } from '@/lib/answer-normalizer';
 import { transcribe } from '@/lib/device-asr';
@@ -94,16 +95,36 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
     }
 
     const audio = form.get('audio');
-    if (!audio || typeof audio === 'string') {
-      throw new ApiError('缺少音频文件（字段名 audio）', 400);
-    }
-    const file = audio as File;
-    audioBytes = Buffer.from(await file.arrayBuffer());
-    filename = file.name || 'voice.mp3';
     sessionId = typeof form.get('sessionId') === 'string'
       ? (form.get('sessionId') as string)
       : '';
     rawQuestionnaireType = form.get('questionnaireType');
+
+    // 【设备端分帧上传】多个名为 packet 的字段，每个是一个完整的 Opus 包。
+    // 这样后端不用自己解析 Opus 裸流（分帧规则容易搞错，错了 MiniMax 就解出垃圾）。
+    const packetParts = form.getAll('packet').filter((p): p is File => typeof p !== 'string');
+    if (packetParts.length > 0) {
+      const packets: Buffer[] = [];
+      for (const part of packetParts) {
+        const buf = Buffer.from(await part.arrayBuffer());
+        if (buf.length > 0) {
+          packets.push(buf);
+        }
+      }
+      if (packets.length === 0) {
+        throw new ApiError('音频包为空', 400);
+      }
+      const sampleRate = Number(form.get('sampleRate') || 16000);
+      audioBytes = packetsToOgg(packets, sampleRate, 1);
+      filename = 'voice.ogg';
+    } else {
+      if (!audio || typeof audio === 'string') {
+        throw new ApiError('缺少音频文件（字段名 audio）', 400);
+      }
+      const file = audio as File;
+      audioBytes = Buffer.from(await file.arrayBuffer());
+      filename = file.name || 'voice.mp3';
+    }
   }
 
   if (audioBytes.length <= 0) {

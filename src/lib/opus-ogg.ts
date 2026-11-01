@@ -114,15 +114,16 @@ function makePage(serial: number, seq: number, granule: number, body: Buffer, fl
 }
 
 /**
- * 裸 Opus → Ogg/Opus。
+ * 把【已经分好帧的】Opus 包打成 Ogg/Opus 容器。
  *
- * @param raw 设备上传的裸 Opus 帧流
- * @param sampleRate 原始采样率（设备端是 16000）
- * @param channels 声道数（设备端是 1）
+ * 为什么不自己解析裸 Opus 流：
+ *   Opus 的分帧规则（TOC 的 code 位）很容易理解错，自己解析会得到错位的包，
+ *   MiniMax 就会解出垃圾音频（实测：识别结果为空）。
+ *   设备端本来就知道每个包的边界（一次 SendAudio = 一个 Opus 包），
+ *   让它把包分开传过来，这里直接组装，最可靠。
  */
-export function opusToOgg(raw: Buffer, sampleRate = 16000, channels = 1): Buffer {
-  const packets = parseOpusPackets(raw);
-  const serial = 0x4c5a5449; // 固定序列号即可
+export function packetsToOgg(packets: Buffer[], sampleRate = 16000, channels = 1): Buffer {
+  const serial = 0x4c5a5449;
   const pages: Buffer[] = [];
 
   // OpusHead（19 字节）
@@ -149,11 +150,34 @@ export function opusToOgg(raw: Buffer, sampleRate = 16000, channels = 1): Buffer
   let seq = 2;
   let granule = 0;
   for (const p of packets) {
-    // granule 以 48kHz 计
-    granule += Math.round((p.durationMs * 48000) / 1000);
-    pages.push(makePage(serial, seq++, granule, p.data, 0x00));
+    // granule 以 48kHz 计；帧长从 TOC 读，读不准也只影响时长显示，不影响解码
+    granule += Math.round((packetDurationMs(p) * 48000) / 1000);
+    pages.push(makePage(serial, seq++, granule, p, 0x00));
   }
   pages.push(makePage(serial, seq, granule, Buffer.alloc(0), 0x04)); // EOS
 
   return Buffer.concat(pages);
+}
+
+/** 从 TOC 估算一个包的时长（毫秒）；只用于 granule，错了也不影响解码 */
+function packetDurationMs(packet: Buffer): number {
+  if (packet.length < 1) return 0;
+  const toc = packet[0];
+  const config = (toc >> 3) & 0x1f;
+  const code = toc & 0x03;
+  const frames = code === 0 ? 1 : 2;
+  const dur = CONFIG_DURATION_MS[config]?.[0] ?? 20;
+  return dur * frames;
+}
+
+/**
+ * 裸 Opus → Ogg/Opus。
+ *
+ * @param raw 设备上传的裸 Opus 帧流
+ * @param sampleRate 原始采样率（设备端是 16000）
+ * @param channels 声道数（设备端是 1）
+ */
+export function opusToOgg(raw: Buffer, sampleRate = 16000, channels = 1): Buffer {
+  const packets = parseOpusPackets(raw);
+  return packetsToOgg(packets.map((p) => p.data), sampleRate, channels);
 }
