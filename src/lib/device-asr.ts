@@ -10,6 +10,7 @@
  */
 
 import { ApiError } from '@/lib/api/response';
+import { opusToOgg } from '@/lib/opus-ogg';
 
 const BASE_URL = process.env.MINIMAX_BASE_URL || 'https://api.minimaxi.com';
 
@@ -30,15 +31,19 @@ function getApiKey(): string {
 export async function transcribe(audio: Buffer, filename: string): Promise<string> {
   const key = getApiKey();
 
-  // 【临时调试】把设备上传的原始音频落盘，用于定位 ASR 失败原因
-  if (filename.endsWith('.opus') && process.env.ASR_DEBUG_DUMP === '1') {
+  let audioPayload = audio;
+  let payloadName = filename || 'audio.mp3';
+
+  // 设备端发的是裸 Opus 帧流（没有 Ogg 容器），MiniMax 的 ASR 不吃这种格式，
+  // 会报 400「invalid params, Invalid data found when processing input (2013)」。
+  // 所以这里先包成 Ogg/Opus 再转上去（实测包完就正常识别了）。
+  if (payloadName.toLowerCase().endsWith('.opus')) {
     try {
-      const { writeFileSync } = await import('node:fs');
-      const p = `/tmp/lzti-asr-${Date.now()}.opus`;
-      writeFileSync(p, audio);
-      console.error(`[asr] dumped ${audio.length} bytes -> ${p} head=${audio.subarray(0, 16).toString('hex')}`);
-    } catch (e) {
-      console.error('[asr] dump failed:', e);
+      audioPayload = opusToOgg(audioPayload, 16000, 1);
+      payloadName = payloadName.replace(/\.opus$/i, '.ogg');
+      console.error(`[asr] wrapped opus into ogg: ${audio.length} -> ${audioPayload.length} bytes`);
+    } catch (err) {
+      console.error('[asr] failed to wrap opus into ogg:', err);
     }
   }
 
@@ -46,8 +51,8 @@ export async function transcribe(audio: Buffer, filename: string): Promise<strin
   form.append('model', 'asr-1.0');
   form.append(
     'file',
-    new Blob([new Uint8Array(audio)], { type: guessContentType(filename) }),
-    filename || 'audio.mp3'
+    new Blob([new Uint8Array(audioPayload)], { type: guessContentType(payloadName) }),
+    payloadName
   );
 
   let res: Response;
