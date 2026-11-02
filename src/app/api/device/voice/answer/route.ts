@@ -148,8 +148,17 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
     questionnaireType
   );
 
+  // 分项耗时计时（2026-11-02 现场延时分析）：
+  // 现场实测答题端到端 ~6.9 秒，必须知道时间花在哪一段。
+  const tStart = Date.now();
+
   // 当前该问哪道题
-  const current = await buildVoiceQuestion(stageId, questionnaireType, answers);
+  // ⚠️ skipAudio：这里只需要知道「当前是哪道题」（题干、题号、量表），
+  // 音频设备早就有了。合成一次 TTS 要 1.5~2.5 秒，白等 —— 直接跳过。
+  const current = await buildVoiceQuestion(stageId, questionnaireType, answers, {
+    skipAudio: true,
+  });
+  const tCurrent = Date.now();
 
   if (current.finished) {
     return apiSuccess({
@@ -164,6 +173,7 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
 
   // ① 语音识别
   const recognizedText = await transcribe(audioBytes, filename);
+  const tAsr = Date.now();
 
   // ② 归一化成 1-5
   const normalized = await normalizeAnswer(recognizedText, {
@@ -172,6 +182,7 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
     useLLM: true,
     questionText: current.questionText,
   });
+  const tNormalize = Date.now();
 
   // ③ 没听懂 → 重念本题，不跳题
   if (normalized.value === null) {
@@ -202,9 +213,17 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
 
   const session = await requireOwnedSession(sessionId, device.userId);
   await saveProgress(session, questionnaireType, merged, 0);
+  const tSaved = Date.now();
 
-  // ⑤ 下一题
+  // ⑤ 下一题（这里要音频：设备要播报下一题）
   const next = await buildVoiceQuestion(stageId, questionnaireType, merged);
+  const tNext = Date.now();
+
+  console.log(
+    `[voice/answer] total=${tNext - tStart}ms | current=${tCurrent - tStart}ms | asr=${tAsr - tCurrent}ms | ` +
+      `normalize=${tNormalize - tAsr}ms | save=${tSaved - tNormalize}ms | next(tts)=${tNext - tSaved}ms | ` +
+      `text="${recognizedText}" value=${normalized.value} viaLLM=${normalized.viaLLM}`
+  );
 
   return apiSuccess({
     recognizedText,

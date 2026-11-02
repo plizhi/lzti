@@ -57,7 +57,8 @@ async function speakForVoice(text: string): Promise<string> {
 export async function buildVoiceQuestion(
   stageId: string,
   questionnaireType: DeviceQuestionnaireType,
-  answers: Record<string, number>
+  answers: Record<string, number>,
+  options?: { skipAudio?: boolean }
 ): Promise<VoiceQuestionState> {
   const questions = getDeviceQuestions(stageId, questionnaireType);
   const scale = questions.scale;
@@ -80,6 +81,7 @@ export async function buildVoiceQuestion(
   const next = flat.find((q) => answers[q.id] === undefined);
 
   if (!next) {
+    const donePrompt = '已经全部答完啦，感谢你的认真作答。';
     return {
       questionId: '',
       questionText: '',
@@ -88,8 +90,9 @@ export async function buildVoiceQuestion(
       totalQuestions: flat.length,
       answeredCount: flat.length,
       finished: true,
-      prompt: '已经全部答完啦，感谢你的认真作答。',
-      audioBase64: await speakForVoice('已经全部答完啦，感谢你的认真作答。'),
+      prompt: donePrompt,
+      // skipAudio：答题接口里「全部答完」这条路径用不到音频
+      audioBase64: options?.skipAudio ? '' : await speakForVoice(donePrompt),
       scale,
     };
   }
@@ -111,7 +114,9 @@ export async function buildVoiceQuestion(
     answeredCount: Object.keys(answers).length,
     finished: false,
     prompt,
-    audioBase64: await speakForVoice(prompt),
+    // skipAudio：答题接口只需要知道「当前是哪道题」，音频设备早就有了，
+    // 重新合成一次 TTS 要 1.5~2.5 秒，白等（实测每次答题多花这么久）。
+    audioBase64: options?.skipAudio ? '' : await speakForVoice(prompt),
     scale,
   };
 }

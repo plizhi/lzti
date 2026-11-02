@@ -49,7 +49,7 @@ describe('报告分享：过期后重新分享', () => {
     expect(res.isExisting).toBe(false);
     const ttl = res.expiresAt.getTime() - before;
     expect(ttl).toBeGreaterThan(23.5 * 3600 * 1000);
-    expect(ttl).toBeLessThanOrEqual(24 * 3600 * 1000);
+    expect(ttl).toBeLessThanOrEqual(24 * 3600 * 1000 + 1000); // 留 1 秒宽容：服务端算 expiresAt 的时刻比测试取 before 晚几毫秒
     expect(prisma.reportShare.update).not.toHaveBeenCalled();
   });
 
@@ -93,6 +93,6 @@ describe('报告分享：过期后重新分享', () => {
     // 有效期重新起算 24 小时
     const ttl = res.expiresAt.getTime() - before;
     expect(ttl).toBeGreaterThan(23.5 * 3600 * 1000);
-    expect(ttl).toBeLessThanOrEqual(24 * 3600 * 1000);
+    expect(ttl).toBeLessThanOrEqual(24 * 3600 * 1000 + 1000); // 留 1 秒宽容：服务端算 expiresAt 的时刻比测试取 before 晚几毫秒
   });
 });
