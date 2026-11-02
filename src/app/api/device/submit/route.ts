@@ -4,6 +4,7 @@ import { withDeviceAuth } from '@/lib/device-auth';
 import { findProgressAttempt, readProgressAnswers, requireOwnedSession } from '@/lib/device-session';
 import { getDeviceQuestions, type DeviceQuestionnaireType } from '@/lib/device-questions';
 import { submitAttempt } from '@/lib/services/assessment.service';
+import { isDemoDevice } from '@/lib/demo';
 import { prisma } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
 import { validateAnswers, validateQuestionnaireType } from '@/lib/validators';
@@ -61,7 +62,16 @@ export const POST = withDeviceAuth(async (request: NextRequest, device) => {
   await prisma.sessionAttempt.delete({ where: { id: attempt.id } });
 
   try {
-    const result = await submitAttempt(session.id, device.userId, {
+    // 演示设备 = **无账号状态**：不扣配额。
+    //
+    // 现场实测（2026-11-02）：演示账号的免费次数用完后，设备提交返回
+    // 403「测评次数已用完」，设备屏幕显示「提交答案失败，按一下重试」，
+    // 现场完全看不出是配额问题（设备对所有失败用同一句文案）。
+    //
+    // 演示本来就是「一台设备反复测」，不吃账号配额；
+    // 真实用户的测评（网页端/注册用户）仍然正常扣配额。
+    const demoDevice = await isDemoDevice(device.userId);
+    const result = await submitAttempt(session.id, demoDevice ? null : device.userId, {
       questionnaireType,
       answers,
     });
