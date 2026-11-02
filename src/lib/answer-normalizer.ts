@@ -22,6 +22,63 @@ const EN_LETTER: Record<string, number> = {
   诶: 1, 欸: 1, 艾: 1, 比: 2, 必: 2, 西: 3, 迪: 4, 伊: 5,
 };
 
+/**
+ * 中文数字的**同音字**（ASR 常见误写）→ 对应的数字。
+ *
+ * ⚠️ 这**不是字母序映射**：本题的选项是 1~5 中文数字（①②③④⑤），
+ * 所以不做 a=1…e=5。英文字母只保留一个例外 —— 「E」：
+ * 家长说「1」（yī）时 MiniMax ASR 经常写成字母「E」（ī，同音），
+ * 实测（2026-11-02）同一场里第 6 题说「1」被记成 5、第 7 题记成 1
+ * （ASR 在「E.」和「一」之间随机摇摆）。
+ * → 字母 E 按「一」处理（=1）。
+ *
+ * 其它字母（a/b/c/d）**一律不认** → 宁可返回 null 让设备重念，
+ * 也不能把「啊」被写成 a 判成 1。
+ */
+const CN_HOMOPHONE: Record<string, number> = {
+  // 一 yī
+  '一': 1, '壹': 1, '伊': 1, '衣': 1, '依': 1, '医': 1, '诶': 1, '欸': 1, '艾': 1, 'e': 1,
+  // 二 èr
+  '二': 2, '贰': 2, '两': 2,
+  // 三 sān
+  '三': 3, '叁': 3, '伞': 3,
+  // 四 sì
+  '四': 4, '肆': 4,
+  // 五 wǔ
+  '五': 5, '伍': 5, '无': 5, '武': 5,
+};
+
+/**
+ * 必须带「选」前缀才认的同音字（裸着说容易是别的意思：
+ * 「是」单独出现可能是「是的」，「爱」可能是别的词）。
+ */
+const CN_HOMOPHONE_NEEDS_PREFIX: Record<string, number> = {
+  '是': 4, '似': 4, '爱': 2, '比': 2, '必': 2, '西': 3, '迪': 4, '屋': 5,
+};
+
+/**
+ * 在一段文本里找同音字对应的数字。
+ *
+ * @param allowNeedsPrefix 是否允许用「必须带选前缀」的那一组
+ *   （裸着说「是」可能是「是的」，所以裸着说时不认）
+ */
+function lookupHomophone(s: string, allowNeedsPrefix: boolean): number | undefined {
+  if (!s) return undefined;
+  const single = (ch: string) =>
+    CN_HOMOPHONE[ch] ?? (allowNeedsPrefix ? CN_HOMOPHONE_NEEDS_PREFIX[ch] : undefined);
+
+  // 整词命中（「玄武」「选伊」）
+  const whole = CN_HOMOPHONE[s] ?? (allowNeedsPrefix ? CN_HOMOPHONE_NEEDS_PREFIX[s] : undefined);
+  if (whole !== undefined) return whole;
+
+  // 逐字找（「玄武」→ 含「武」；「选是」→ 含「是」）
+  for (const ch of s) {
+    const v = single(ch);
+    if (v !== undefined) return v;
+  }
+  return undefined;
+}
+
 /** 明确表示「没答上来」的词——这些必须返回 null，不能猜 */
 const REFUSAL_PATTERNS = [
   '不知道', '不清楚', '不确定', '没听清', '听不清', '再说一次', '没懂',
@@ -68,22 +125,32 @@ export function normalizeByRule(text: string, min: number, max: number): number 
 
   const inRange = (n: number) => n >= min && n <= max;
 
-  // ② 字母式：「选a」「a」「选诶」「答案是b」
-  //    必须优先于数字式，因为「选A」里的 a 不是数字
-  const letterMatch = raw.match(/选\s*([a-e诶欸艾比必西迪伊])|(?:^|[^a-z])([a-e])(?:[^a-z]|$)/);
-  if (letterMatch) {
-    const letter = (letterMatch[1] || letterMatch[2] || '').toLowerCase();
-    let n = EN_LETTER[letter];
-    // ⚠️ 同音字坑（现场实测 2026-11-02）：
-    //    家长说「1」（yī），MiniMax ASR 经常写成字母「E」（ī，同音）→
-    //    按字母表把 E 当第 5 个 → **说 1 被记成 5**（同一次实测里第 6 题说 e 记成 5、
-    //    第 7 题说 e 记成 1，因为 ASR 在「E.」和「一」之间随机摇摆）。
-    //    本题选项是 1~5 数字，家长基本不会说字母 → 裸「E」几乎必然是「一」→ 判 1。
-    //    带「选」前缀的「选E」不变（那是明确指第 5 个）。
-    if (letterMatch[2] && letter === 'e') {
-      n = 1;
+  // ② 同音字：「选伊」→1、「选是」→4、「玄武」→5、「E」→1
+  //    ⚠️ 不做字母序映射（选项是 1~5 中文数字，不存在 A~E 选项）。
+  //    英文字母只认 E —— 因为 ASR 常把「一」(yī) 写成 E(ī)，实测会丢成 5。
+  {
+    const chooseMatch = raw.match(/^选(.+)$/);
+    if (chooseMatch) {
+      const tail = chooseMatch[1];
+      if (/^[不没]/.test(tail)) {
+        // 「选不是」「选没…」→ 不是选项
+        return null;
+      }
+      // 「选三」「选4」
+      const directNum = /^[一二三四五壹贰叁肆伍]$/.test(tail)
+        ? CN_NUM[tail]
+        : /^\d$/.test(tail)
+          ? parseInt(tail, 10)
+          : undefined;
+      if (directNum !== undefined && inRange(directNum)) return directNum;
+      // 「选伊」「选是」「选爱」「选E」「选玄武」
+      const homo = lookupHomophone(tail, true);
+      if (homo !== undefined && inRange(homo)) return homo;
+    } else {
+      // 裸着说的同音字：「伊」「诶」「武」「E」等（不带前缀的不认「是/爱」这些）
+      const homo = lookupHomophone(raw, false);
+      if (homo !== undefined && inRange(homo)) return homo;
     }
-    if (n !== undefined && inRange(n)) return n;
   }
 
   // ③ 中文数字：「三」「第三」「第三题」
@@ -165,9 +232,10 @@ async function normalizeByLLM(
   语音识别经常把序号听成同音的别的字，例如「选五」→「玄武」、「选一」→「选伊」、
   「选四」→「选是」、「选二」→「选爱」。
   如果听到的是这类同音错字，就按它对应的数字理解（玄武=5、选伊=1、选是=4、选爱=2）。
-  ⚠️ 另外：**裸字母「E」（没带「选」字）几乎一定是「一」的同音误写 → 判 1**；
-  只有「选E」这种带前缀的才是第 5 个。现场实测（2026-11-02）家长说「1」被写成「E.」，
-  按字母表判成 5 → 说 1 记成 5。
+  ⚠️ **本题没有 A~E 选项，选项就是中文数字 1~5**。
+  如果识别文本里出现了英文字母，那几乎一定是中文数字的同音误写：
+  **「E」=「一」= 1**（现场实测：家长说「1」被 ASR 写成「E.」，按字母顺序判成 5 → 说 1 记成 5）。
+  不要按字母顺序（A=1、B=2…）理解。
 - 如果用户明确表示不知道、不确定、拒绝作答、或者没有表达出任何选项，必须返回 null
 - 不要猜测。用户说"应该是第三个吧"这种犹豫但明确指向第三个的，可以返回 3
 - 只输出 JSON，不要任何其他文字`;

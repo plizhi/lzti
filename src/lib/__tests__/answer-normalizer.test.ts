@@ -13,10 +13,11 @@ const MIN = 1;
 const MAX = 5;
 
 describe('normalizeByRule — ASR 真实输出', () => {
-  // 这批是实测「TTS 生成 → ASR 回读」得到的真实文本
+  // 这批是实测「TTS 生成 → ASR 回读」得到的真实文本。
+  // ⚠️ 2026-11-02 更新：提示词已改成「请选择，1到5」（中文数字），
+  // 所以 ASR 不再输出字母选项（旧的「选A。/选B。/选C。」是上一代提示词的产物）。
+  // 现在只偶尔出现字母 **E** —— 那是「一」(yī) 的同音误写。
   const realCases: Array<[string, number]> = [
-    ['选A。', 1],
-    ['选B。', 2],
     ['三。', 3],
     ['第三。', 3],
     ['第三个。', 3],
@@ -27,7 +28,9 @@ describe('normalizeByRule — ASR 真实输出', () => {
     ['我觉得是四吧', 4],
     ['一', 1],
     ['四。', 4],
-    ['选C。', 3],
+    ['E.', 1],          // 「一」被写成字母 E（同音）
+    ['E。', 1],
+    ['选一', 1],
   ];
 
   for (const [text, expected] of realCases) {
@@ -35,17 +38,22 @@ describe('normalizeByRule — ASR 真实输出', () => {
       expect(normalizeByRule(text, MIN, MAX)).toBe(expected);
     });
   }
+
+  it('字母 A/B/C/D 不认（选项是中文数字，没有字母选项）→ null', () => {
+    expect(normalizeByRule('选A。', MIN, MAX)).toBeNull();
+    expect(normalizeByRule('选B。', MIN, MAX)).toBeNull();
+    expect(normalizeByRule('选C。', MIN, MAX)).toBeNull();
+    expect(normalizeByRule('A', MIN, MAX)).toBeNull();
+  });
 });
 
 describe('normalizeByRule — 口语变体', () => {
   const cases: Array<[string, number]> = [
-    ['选a', 1],
-    ['选A', 1],
-    ['A', 1],
-    ['a', 1],
-    ['选诶', 1],        // 谐音，实测 ASR 会输出「选A」
-    ['选b', 2],
-    ['选e', 5],
+    ['选诶', 1],        // 谐音
+    ['选伊', 1],         // 「选一」被 ASR 写成「选伊」
+    ['选是', 4],         // 「选四」被写成「选是」
+    ['选爱', 2],         // 「选二」被写成「选爱」
+    ['玄武', 5],         // 「五」被写成「玄武」
     ['1', 1],
     ['5', 5],
     ['我选2', 2],
@@ -101,7 +109,13 @@ describe('normalizeByRule — 范围外的数字不采纳', () => {
 
 describe('normalizeAnswer — 不启用 LLM 时', () => {
   it('规则命中直接返回，不走 LLM', async () => {
-    const r = await normalizeAnswer('选A', { min: MIN, max: MAX, useLLM: false });
+    const r = await normalizeAnswer('选一', { min: MIN, max: MAX, useLLM: false });
+    expect(r.value).toBe(1);
+    expect(r.viaLLM).toBe(false);
+  });
+
+  it('「E」（一 的同音误写）规则直接命中 1', async () => {
+    const r = await normalizeAnswer('E.', { min: MIN, max: MAX, useLLM: false });
     expect(r.value).toBe(1);
     expect(r.viaLLM).toBe(false);
   });
@@ -120,8 +134,22 @@ describe('同音字：ASR 把「一」写成字母 E', () => {
     expect(normalizeByRule('E', 1, 5)).toBe(1);
   });
 
-  it('带「选」前缀的 E 仍是第 5 个（明确指第 5 个选项）', () => {
-    expect(normalizeByRule('选E', 1, 5)).toBe(5);
+  it('带「选」前缀的 E 也是 1（本题没有字母选项，E 就是「一」的同音）', () => {
+    expect(normalizeByRule('选E', 1, 5)).toBe(1);
+  });
+
+  it('中文同音字：「选伊」=1、「选是」=4、「选爱」=2、「玄武」=5', () => {
+    expect(normalizeByRule('选伊', 1, 5)).toBe(1);
+    expect(normalizeByRule('选是', 1, 5)).toBe(4);
+    expect(normalizeByRule('选爱', 1, 5)).toBe(2);
+    expect(normalizeByRule('玄武', 1, 5)).toBe(5);
+  });
+
+  it('其余字母不认 → null（宁可重念也不给错答案）', () => {
+    expect(normalizeByRule('选A', 1, 5)).toBeNull();
+    expect(normalizeByRule('选B', 1, 5)).toBeNull();
+    expect(normalizeByRule('选D', 1, 5)).toBeNull();
+    expect(normalizeByRule('a', 1, 5)).toBeNull();
   });
 
   it('中文「一」仍然是 1', () => {
