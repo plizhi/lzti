@@ -173,7 +173,7 @@ export const junior3ParentQuestions: Question[] = [
   { id: 'j3-p-ms-2', dimensionId: 'mental-stability', axisId: 'emotion-recovery', text: '孩子心情不好的时候，过不了多久就能缓过来。', reverse: false },
   { id: 'j3-p-ms-3', dimensionId: 'mental-stability', axisId: 'support-connection', text: '孩子心情不好的时候，会找我或找别人说说，不会全闷在心里。', reverse: false },
   { id: 'j3-p-ms-4', dimensionId: 'mental-stability', axisId: 'support-connection', text: '在家里，孩子愿意和我说说心里话。', reverse: false },
-  { id: 'j3-p-ms-5', dimensionId: 'mental-stability', axisId: 'support-connection', text: '即使我着急他的成绩，我也不会让他觉得考不好就不被爱了。', reverse: false },
+  { id: 'j3-p-ms-5', dimensionId: 'mental-stability', axisId: 'support-connection', text: '孩子不会因为一次考不好，就觉得爸妈不爱他了。', reverse: false },
 ];
 
 // 教师卷（11题）

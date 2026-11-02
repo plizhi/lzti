@@ -150,7 +150,7 @@ export const senior1StudentQuestions: Question[] = [
 
 export const senior1ParentQuestions: Question[] = [
   // 自我认知 1-3
-  { id: 's1-par-sc-1', dimensionId: 'self-cognition', axisId: 'self-awareness', text: '孩子和我聊过，他觉得自己擅长什么、不擅长什么。', reverse: false },
+  { id: 's1-par-sc-1', dimensionId: 'self-cognition', axisId: 'self-awareness', text: '孩子知道自己擅长什么、不擅长什么。', reverse: false },
   { id: 's1-par-sc-2', dimensionId: 'self-cognition', axisId: 'self-acceptance', text: '孩子做不好的时候，不会一直贬低自己。', reverse: false },
   { id: 's1-par-sc-3', dimensionId: 'self-cognition', axisId: 'self-acceptance', text: '孩子能接受自己有些事情暂时做不好，不会因此全盘否定自己。', reverse: false },
 
