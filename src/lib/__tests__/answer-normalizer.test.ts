@@ -138,11 +138,18 @@ describe('同音字：ASR 把「一」写成字母 E', () => {
     expect(normalizeByRule('选E', 1, 5)).toBe(1);
   });
 
-  it('中文同音字：「选伊」=1、「选是」=4、「选爱」=2、「玄武」=5', () => {
+  it('中文同音字（实测过的）：「选伊」=1、「选是」=4、「选爱」=2、「玄武」=5', () => {
     expect(normalizeByRule('选伊', 1, 5)).toBe(1);
     expect(normalizeByRule('选是', 1, 5)).toBe(4);
     expect(normalizeByRule('选爱', 1, 5)).toBe(2);
     expect(normalizeByRule('玄武', 1, 5)).toBe(5);
+  });
+
+  it('未实测的同音写法一律不收（「选必」「选西」「选迪」都是字母推出来的）', () => {
+    expect(normalizeByRule('选必', 1, 5)).toBeNull();
+    expect(normalizeByRule('选西', 1, 5)).toBeNull();
+    expect(normalizeByRule('选迪', 1, 5)).toBeNull();
+    expect(normalizeByRule('选比', 1, 5)).toBeNull();
   });
 
   it('其余字母不认 → null（宁可重念也不给错答案）', () => {
