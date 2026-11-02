@@ -111,3 +111,22 @@ describe('normalizeAnswer — 不启用 LLM 时', () => {
     expect(r.value).toBeNull();
   });
 });
+
+// 同音字坑（现场实测 2026-11-02）：家长说「1」→ ASR 写成「E.」→ 被当成第 5 个
+describe('同音字：ASR 把「一」写成字母 E', () => {
+  it('裸 E 判 1（说 1 不能记成 5）', () => {
+    expect(normalizeByRule('E.', 1, 5)).toBe(1);
+    expect(normalizeByRule('e', 1, 5)).toBe(1);
+    expect(normalizeByRule('E', 1, 5)).toBe(1);
+  });
+
+  it('带「选」前缀的 E 仍是第 5 个（明确指第 5 个选项）', () => {
+    expect(normalizeByRule('选E', 1, 5)).toBe(5);
+  });
+
+  it('中文「一」仍然是 1', () => {
+    expect(normalizeByRule('一', 1, 5)).toBe(1);
+    expect(normalizeByRule('选一', 1, 5)).toBe(1);
+  });
+});
+

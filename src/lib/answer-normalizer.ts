@@ -73,7 +73,16 @@ export function normalizeByRule(text: string, min: number, max: number): number 
   const letterMatch = raw.match(/选\s*([a-e诶欸艾比必西迪伊])|(?:^|[^a-z])([a-e])(?:[^a-z]|$)/);
   if (letterMatch) {
     const letter = (letterMatch[1] || letterMatch[2] || '').toLowerCase();
-    const n = EN_LETTER[letter];
+    let n = EN_LETTER[letter];
+    // ⚠️ 同音字坑（现场实测 2026-11-02）：
+    //    家长说「1」（yī），MiniMax ASR 经常写成字母「E」（ī，同音）→
+    //    按字母表把 E 当第 5 个 → **说 1 被记成 5**（同一次实测里第 6 题说 e 记成 5、
+    //    第 7 题说 e 记成 1，因为 ASR 在「E.」和「一」之间随机摇摆）。
+    //    本题选项是 1~5 数字，家长基本不会说字母 → 裸「E」几乎必然是「一」→ 判 1。
+    //    带「选」前缀的「选E」不变（那是明确指第 5 个）。
+    if (letterMatch[2] && letter === 'e') {
+      n = 1;
+    }
     if (n !== undefined && inRange(n)) return n;
   }
 
@@ -156,6 +165,9 @@ async function normalizeByLLM(
   语音识别经常把序号听成同音的别的字，例如「选五」→「玄武」、「选一」→「选伊」、
   「选四」→「选是」、「选二」→「选爱」。
   如果听到的是这类同音错字，就按它对应的数字理解（玄武=5、选伊=1、选是=4、选爱=2）。
+  ⚠️ 另外：**裸字母「E」（没带「选」字）几乎一定是「一」的同音误写 → 判 1**；
+  只有「选E」这种带前缀的才是第 5 个。现场实测（2026-11-02）家长说「1」被写成「E.」，
+  按字母表判成 5 → 说 1 记成 5。
 - 如果用户明确表示不知道、不确定、拒绝作答、或者没有表达出任何选项，必须返回 null
 - 不要猜测。用户说"应该是第三个吧"这种犹豫但明确指向第三个的，可以返回 3
 - 只输出 JSON，不要任何其他文字`;
