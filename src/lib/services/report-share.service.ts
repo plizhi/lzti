@@ -43,14 +43,44 @@ export async function createReportShare(
     where: { attemptId },
   });
 
+  // 已存在的分享：
+  //   - 未过期 → 直接复用（同一份报告、同一份有效期，不追溯改）
+  //   - 已过期 → **换一个新码 + 延到 now+24h**。
+  //     修 bug（2026-11-02）：原来这里不管过没过期都直接返回旧码，
+  //     于是「第二次分享」拿到的还是那个已过期的链接（410 打不开）。
+  //     ReportShare.attemptId 是唯一索引 → 同一个 attempt 只能有一行，
+  //     所以用 update 换码而不是新建。
   if (existing) {
-    // 返回已有的分享
+    if (existing.expiresAt >= new Date()) {
+      // 返回已有的分享
+      return {
+        shareId: existing.id,
+        shareCode: existing.shareCode,
+        shareUrl: `/shared/report/${existing.shareCode}`,
+        expiresAt: existing.expiresAt,
+        isExisting: true,
+        // 附加信息
+        childName: attempt.session.child.name,
+        stageName: questionnaire?.name,
+        quadrantLabels,
+        assessedAt: attempt.createdAt,
+      };
+    }
+
+    const renewedExpiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
+    const renewedCode = await generateReportShareCode();
+    const renewed = await prisma.reportShare.update({
+      where: { id: existing.id },
+      data: { shareCode: renewedCode, expiresAt: renewedExpiresAt },
+    });
+
     return {
-      shareId: existing.id,
-      shareCode: existing.shareCode,
-      shareUrl: `/shared/report/${existing.shareCode}`,
-      expiresAt: existing.expiresAt,
-      isExisting: true,
+      shareId: renewed.id,
+      shareCode: renewed.shareCode,
+      shareUrl: `/shared/report/${renewed.shareCode}`,
+      expiresAt: renewed.expiresAt,
+      isExisting: false,
+      renewed: true,
       // 附加信息
       childName: attempt.session.child.name,
       stageName: questionnaire?.name,

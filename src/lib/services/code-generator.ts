@@ -1,4 +1,17 @@
 import { prisma } from '@/lib/db';
+import { randomInt } from 'crypto';
+
+/**
+ * 从字符表里随机取一个字符。
+ *
+ * 用 crypto.randomInt（密码学安全）而不是 Math.random：
+ * Math.random 是 xorshift128+，不是 CSPRNG，
+ * 码一旦被大量采样就有被预测的可能（分享码 = 报告的访问凭证）。
+ * 2026-11-02 起，批次码 / 推荐码 / 报告分享码统一走 randomInt。
+ */
+function randomChar(chars: string): string {
+  return chars.charAt(randomInt(chars.length));
+}
 
 // 码格式定义
 export const CODE_FORMATS = {
@@ -6,17 +19,23 @@ export const CODE_FORMATS = {
   BATCH: {
     length: 6,
     chars: '0123456789',
-    generate: () => Math.random().toString().slice(2, 8).padStart(6, '0'),
+    generate: () => {
+      let code = '';
+      for (let i = 0; i < 6; i++) {
+        code += randomChar('0123456789');
+      }
+      return code;
+    },
   },
   // 8位大写字母数字 - 用户推荐码
   REFERRAL: {
     length: 8,
     chars: 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
     generate: () => {
-      let code = '';
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
       for (let i = 0; i < 8; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+        code += randomChar(chars);
       }
       return code;
     },
@@ -26,10 +45,10 @@ export const CODE_FORMATS = {
     length: 8,
     chars: 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789',
     generate: () => {
-      let code = '';
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+      let code = '';
       for (let i = 0; i < 8; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+        code += randomChar(chars);
       }
       return code;
     },
